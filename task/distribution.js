@@ -93,7 +93,7 @@ class Distribution {
    * @returns {boolean} Result of the check for data changes
    */
   checkIfSubmissionHasChanges(submission) {
-    // Here we check if total_points have changed instead of listening_points
+    // Compare total_points to determine if there were any changes
     return submission.total_points && submission.total_points > 0;
   }
 

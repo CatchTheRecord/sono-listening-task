@@ -1,11 +1,6 @@
 const { namespaceWrapper } = require('@_koii/namespace-wrapper');
-const { KoiiStorageClient } = require('@_koii/storage-task-sdk'); // Import KoiiStorageClient
 
 class Submission {
-  constructor() {
-    this.client = new KoiiStorageClient(); // Initialize KoiiStorageClient
-  }
-
   /**
    * Koii task for tracking the user's radio listening activity.
    * @param {number} round - Round number
@@ -30,12 +25,12 @@ class Submission {
     }
 
     // Cache data for the user's listening activity on the Koii node
-    const isUpdated = await this.cachePlayerListeningDataIfUpdated(playerData);
+    const isUpdated = await this.cachePlayerListeningDataIfUpdated(playerData, round);
 
     if (isUpdated) {
-      console.log(`Player data for ${username} has been modified and updated in the cache.`);
+      console.log(`Player data for ${username} has been modified and updated in the cache for round ${round}.`);
     } else {
-      console.log(`Player data for ${username} remains unchanged.`);
+      console.log(`Player data for ${username} remains unchanged for round ${round}.`);
     }
   }
 
@@ -67,18 +62,20 @@ class Submission {
 
   /**
    * Cache player listening data on the Koii node if the data has changed.
-   * @param {Object} playerData - Player data (username, total_points, level, relics, etc.)
+   * @param {Object} playerData - Player data (username, total_points, etc.)
+   * @param {number} round - Round number
    * @returns {Promise<boolean>} - Returns true if the data was updated, otherwise false.
    */
-  async cachePlayerListeningDataIfUpdated(playerData) {
+  async cachePlayerListeningDataIfUpdated(playerData, round) {
     try {
-      const cacheKey = `player_data_${playerData.username}`;
-      const cachedData = await namespaceWrapper.storeGet(cacheKey);
+      const cacheKey = `player_data_${playerData.username}_${round}`;
+      const previousRoundKey = `player_data_${playerData.username}_${round - 1}`;
+      const cachedData = await namespaceWrapper.storeGet(previousRoundKey);
 
       if (cachedData) {
         const cachedPlayerData = JSON.parse(cachedData);
 
-        // Compare total_points: if changed, update the cache
+        // Compare total_points with the previous round: if changed, update the cache
         if (this.isPlayerListeningDataChanged(cachedPlayerData, playerData)) {
           await namespaceWrapper.storeSet(cacheKey, JSON.stringify(playerData));
           return true; // Data changed and was updated
@@ -86,7 +83,7 @@ class Submission {
           return false; // Data remained the same
         }
       } else {
-        // If no data is cached, store it
+        // If no data for the previous round is cached, store the current data
         await namespaceWrapper.storeSet(cacheKey, JSON.stringify(playerData));
         return true; // New data was saved
       }
@@ -103,7 +100,7 @@ class Submission {
    * @returns {boolean} - True if total_points changed, otherwise false
    */
   isPlayerListeningDataChanged(cachedData, newData) {
-    return cachedData.total_points !== newData.total_points; // We track the total_points field
+    return cachedData.total_points !== newData.total_points;
   }
 }
 

@@ -15,7 +15,7 @@ class Audit {
     console.log(`Validating submission for round ${round}`);
     try {
       // Retrieve cached player data for the current node's user
-      const cachedData = await this.fetchCachedPlayerData();
+      const cachedData = await this.fetchCachedPlayerData(round - 1); // Fetch data from the previous round
 
       if (!cachedData) {
         console.error('No cached data available for validation.');
@@ -50,14 +50,15 @@ class Audit {
   }
 
   /**
-   * Retrieve cached player data from the node's storage.
+   * Retrieve cached player data from the node's storage for the previous round.
+   * @param {number} round - Previous round number
    * @returns {Promise<Object|null>} - Cached player data or null if not found.
    */
-  async fetchCachedPlayerData() {
+  async fetchCachedPlayerData(round) {
     try {
       // Fetch the player's username from environment variables
-      const username = process.env.USERNAME; // The username provided by the node operator
-      const cacheKey = `player_data_${username}`;
+      const username = process.env.USERNAME;
+      const cacheKey = `player_data_${username}_${round}`;
 
       const cachedData = await namespaceWrapper.storeGet(cacheKey);
       if (!cachedData) {
