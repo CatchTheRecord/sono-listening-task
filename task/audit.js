@@ -14,7 +14,7 @@ class Audit {
   async validateNode(submission_value, round) {
     console.log(`Validating submission for round ${round}`);
     try {
-      // Retrieve cached player data for the current node's user
+      // Retrieve cached player data for the current node's user from the previous round
       const cachedData = await this.fetchCachedPlayerData(round - 1); // Fetch data from the previous round
 
       if (!cachedData) {
@@ -22,16 +22,16 @@ class Audit {
         return false;
       }
 
-      // Here, submission_value is expected to be the new total_points or activity data
-      const isChanged = this.hasChanges(cachedData, submission_value);
+      // Validate the submission value (expected to be total_points or activity data)
+      const isValid = this.hasChanges(cachedData, submission_value);
 
-      if (isChanged) {
-        console.log(`Player's activity changed in round ${round}. Submission passed validation.`);
+      if (isValid) {
+        console.log(`Player's activity has changed in round ${round}. Submission passed validation.`);
       } else {
-        console.log(`No activity changes in round ${round}. Submission passed validation.`);
+        console.log(`No changes detected in player activity for round ${round}. Submission passed validation.`);
       }
 
-      return true; // Regardless of whether data changed, consider it valid
+      return true; // Consider it valid regardless of whether data changed
     } catch (error) {
       console.error('Error during validation:', error);
       return false;
@@ -41,12 +41,22 @@ class Audit {
   /**
    * Check if player data has changed (based on total_points or other activity).
    * @param {Object} cachedData - Cached player data.
-   * @param {Object} newData - New data representing player's current activity (e.g., total_points).
+   * @param {Object} submission_value - New data representing player's current activity (e.g., total_points).
    * @returns {boolean} - True if data has changed, otherwise false.
    */
-  hasChanges(cachedData, newData) {
-    // Compare cached total_points with the submitted total_points
-    return cachedData.total_points !== newData.total_points;
+  hasChanges(cachedData, submission_value) {
+    try {
+      const submittedData = JSON.parse(submission_value);
+      console.log(`Comparing cached data with submitted data:`);
+      console.log('Cached data:', cachedData);
+      console.log('Submitted data:', submittedData);
+      
+      // Compare cached total_points with the submitted total_points
+      return cachedData.total_points !== submittedData.total_points;
+    } catch (error) {
+      console.error('Error comparing data:', error);
+      return false;
+    }
   }
 
   /**
@@ -57,12 +67,18 @@ class Audit {
   async fetchCachedPlayerData(round) {
     try {
       // Fetch the player's username from environment variables
-      const username = process.env.USERNAME;
+      const username = process.env.TG_USERNAME;
+      if (!username) {
+        console.error('No username found in environment variables.');
+        return null;
+      }
+
       const cacheKey = `player_data_${username}_${round}`;
+      console.log(`Fetching cached data with key: ${cacheKey}`);
 
       const cachedData = await namespaceWrapper.storeGet(cacheKey);
       if (!cachedData) {
-        console.error('No cached data found for the player.');
+        console.error(`No cached data found for key: ${cacheKey}`);
         return null;
       }
 
