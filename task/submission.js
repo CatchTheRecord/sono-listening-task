@@ -9,10 +9,10 @@ class Submission {
     console.log(`Task started for round: ${round}`);
 
     // Fetch the node operator's username from the environment variables
-    const username = process.env.TG_USERNAME; // The username is set as a task variable
+    const username = process.env.TG_USERNAME;
 
     if (!username) {
-      console.error('No username found. Please set the TG_USERNAME environment variable.');
+      console.error('No TG_USERNAME found. Please set the TG_USERNAME environment variable.');
       return;
     }
 
@@ -26,15 +26,15 @@ class Submission {
       return;
     }
 
-    console.log(`Player data fetched for user: ${username}`, playerData);
+    console.log(`Player data fetched for user: ${playerData.username}`, playerData);
 
     // Cache data for the user's listening activity on the Koii node
     const isUpdated = await this.cachePlayerListeningDataIfUpdated(playerData, round);
 
     if (isUpdated) {
-      console.log(`Player data for ${username} has been modified and updated in the cache for round ${round}.`);
+      console.log(`Player data for ${playerData.username} has been modified and updated in the cache for round ${round}.`);
     } else {
-      console.log(`Player data for ${username} remains unchanged for round ${round}.`);
+      console.log(`Player data for ${playerData.username} remains unchanged for round ${round}.`);
     }
   }
 
@@ -46,11 +46,11 @@ class Submission {
   async getPlayerDataFromServer(username) {
     try {
       console.log(`Sending request to fetch data for user: ${username}`);
-      
+
       const response = await fetch('https://reverie-field-project-7a9a67da93ff.herokuapp.com/get_player_data_for_koii', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username }) // Pass the username to the server
+        body: JSON.stringify({ username }) // Передаем username для получения данных
       });
 
       if (!response.ok) {
