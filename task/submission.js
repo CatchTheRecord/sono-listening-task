@@ -9,7 +9,7 @@ class Submission {
     console.log(`Task started for round: ${round}`);
 
     // Fetch the node operator's username from the environment variables
-    const username = process.env.USERNAME; // The username is set as a task variable
+    const username = process.env.TG_USERNAME; // The username is set as a task variable
 
     if (!username) {
       console.error('No username found. Please set the USERNAME environment variable.');

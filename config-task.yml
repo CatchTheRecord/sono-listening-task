@@ -48,14 +48,14 @@ space: 2
 
 requirementsTags:
   - type: TASK_VARIABLE
-    value: "USERNAME"
-    description: "Your username in the Reverie Field game"
+    value: "TG_USERNAME"
+    description: "Your username in the Reverie Field game and unique @username in Telegram"
 
 # OPTIONAL variables for creating task / REQUIRED variables for updating task
 
 # ONLY provide the task_id and migrationDescription if you are updating the task, otherwise leave blank.
 # Task_id: Previous task ID.
-task_id: '8XhuD4WoFZ9PVXv9RusCDtRy2NMu9rXdcLHWGPgJMxvo'
+task_id: ''
 
 # Migration description: Provide the description for changes made in the new version of the task.
-migrationDescription: 'new description'
+migrationDescription: ''
