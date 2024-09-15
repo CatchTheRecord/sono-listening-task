@@ -1,40 +1,37 @@
 const { namespaceWrapper } = require('@_koii/namespace-wrapper');
-const { KoiiStorageClient } = require('@_koii/storage-task-sdk'); // Import KoiiStorageClient
 
 class Audit {
   constructor() {
-    this.client = new KoiiStorageClient(); // Initialize KoiiStorageClient
+    // IPFS и другие внешние клиенты не нужны для текущей задачи.
   }
 
   /**
-   * Validate submission for the node.
-   * @param {string} submission_value - The CID of the submission from IPFS.
+   * Validate the activity for the node.
+   * @param {string} submission_value - The value representing the player's activity.
    * @param {number} round - The round number.
    * @returns {Promise<boolean>} - Result of the validation.
    */
   async validateNode(submission_value, round) {
     console.log(`Validating submission for round ${round}`);
     try {
-      // Fetch data from IPFS using the provided CID
-      const ipfsData = await this.getDataFromIPFS(submission_value);
-      if (!ipfsData) {
-        console.error('Failed to retrieve data from IPFS.');
+      // Retrieve cached player data for the current node's user
+      const cachedData = await this.fetchCachedPlayerData();
+
+      if (!cachedData) {
+        console.error('No cached data available for validation.');
         return false;
       }
 
-      // Fetch cached player data
-      const cachedData = await this.fetchCachedPlayerData();
-
-      // Check if there are any changes
-      const isChanged = this.hasChanges(cachedData, ipfsData);
+      // Here, submission_value is expected to be the new total_points or activity data
+      const isChanged = this.hasChanges(cachedData, submission_value);
 
       if (isChanged) {
-        console.log(`Data changed in round ${round}. Submission passed validation.`);
+        console.log(`Player's activity changed in round ${round}. Submission passed validation.`);
       } else {
-        console.log(`No data changes in round ${round}. Submission passed validation.`);
+        console.log(`No activity changes in round ${round}. Submission passed validation.`);
       }
 
-      return true; // Regardless of whether data changed or not, the submission is valid
+      return true; // Regardless of whether data changed, consider it valid
     } catch (error) {
       console.error('Error during validation:', error);
       return false;
@@ -42,61 +39,36 @@ class Audit {
   }
 
   /**
-   * Retrieve data from IPFS using the CID.
-   * @param {string} cid - The CID of the data in IPFS.
-   * @returns {Promise<Array|null>} - Data from IPFS or null in case of an error.
-   */
-  async getDataFromIPFS(cid) {
-    try {
-      const fileName = 'submittedData.json'; // File name to extract data from IPFS
-      const blob = await this.client.getFile(cid, fileName);
-      const text = await blob.text();
-      const data = JSON.parse(text); // Parse text data into JSON
-      console.log('Data successfully retrieved from IPFS:', data);
-      return data;
-    } catch (error) {
-      console.error('Error fetching data from IPFS:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Check if data has changed.
-   * @param {Array} cachedData - Cached data.
-   * @param {Array} newData - Data from IPFS.
+   * Check if player data has changed (based on total_points or other activity).
+   * @param {Object} cachedData - Cached player data.
+   * @param {Object} newData - New data representing player's current activity (e.g., total_points).
    * @returns {boolean} - True if data has changed, otherwise false.
    */
   hasChanges(cachedData, newData) {
-    return JSON.stringify(cachedData) !== JSON.stringify(newData);
+    // Compare cached total_points with the submitted total_points
+    return cachedData.total_points !== newData.total_points;
   }
 
   /**
-   * Retrieve all cached player data.
-   * @returns {Promise<Array>} - Array of player data from the cache.
+   * Retrieve cached player data from the node's storage.
+   * @returns {Promise<Object|null>} - Cached player data or null if not found.
    */
   async fetchCachedPlayerData() {
     try {
-      const cacheKeys = await namespaceWrapper.storeGet('cacheKeys');
-      if (!cacheKeys) {
-        console.error('Failed to retrieve cache keys.');
-        return [];
+      // Fetch the player's username from environment variables
+      const username = process.env.USERNAME; // The username provided by the node operator
+      const cacheKey = `player_data_${username}`;
+
+      const cachedData = await namespaceWrapper.storeGet(cacheKey);
+      if (!cachedData) {
+        console.error('No cached data found for the player.');
+        return null;
       }
 
-      const parsedKeys = JSON.parse(cacheKeys);
-      const playersData = [];
-
-      for (const key of parsedKeys) {
-        const playerData = await namespaceWrapper.storeGet(key);
-        if (playerData) {
-          playersData.push(JSON.parse(playerData));
-        }
-      }
-
-      console.log('Cached player data successfully retrieved.');
-      return playersData;
+      return JSON.parse(cachedData); // Parse cached data
     } catch (error) {
-      console.error('Error retrieving data from the cache:', error);
-      return [];
+      console.error('Error retrieving data from cache:', error);
+      return null;
     }
   }
 

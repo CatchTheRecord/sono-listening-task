@@ -93,8 +93,8 @@ class Distribution {
    * @returns {boolean} Result of the check for data changes
    */
   checkIfSubmissionHasChanges(submission) {
-    // Simplified check: if there is any data in the submission, it's considered valid
-    return submission && Object.keys(submission).length > 0;
+    // Here we check if total_points have changed instead of listening_points
+    return submission.total_points && submission.total_points > 0;
   }
 
   /**
