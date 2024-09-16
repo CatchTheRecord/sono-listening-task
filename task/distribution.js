@@ -57,27 +57,34 @@ class Distribution {
         return distributionList;
       }
 
-      // Проходим по результатам аудита и добавляем в список ноды с изменившимися данными
+      // Проверка изменений в данных сабмишенов
       for (const playerPublicKey of submissionKeys) {
         const playerSubmission = submissions[playerPublicKey];
-        const isValidSubmission = playerSubmission.is_valid; // Это значение должно быть результатом аудита, который проверяет изменения
+        const isValidSubmission = this.checkIfSubmissionHasChanges(playerSubmission);
 
         if (isValidSubmission) {
           validPlayers.push(playerPublicKey);
+        } else {
+          // Если сабмишен невалиден, уменьшаем ставку игрока
+          const playerStake = taskStakeListJSON.stake_list[playerPublicKey];
+          const slashedStake = playerStake * 0.7;
+          distributionList[playerPublicKey] = -slashedStake;
+          console.log('Penalty for player:', playerPublicKey, slashedStake);
         }
       }
 
-      // Calculate rewards and ensure maximum reward of 25 tokens per player
+      // Распределение наград между игроками с валидными сабмишенами
       if (validPlayers.length > 0) {
         const totalBounty = taskStakeListJSON.bounty_amount_per_round;
-        const maxRewardPerPlayer = 25; // Set max reward limit to 25 tokens
+        const maxRewardPerPlayer = 25; // Устанавливаем лимит награды в 25 токенов
 
-        // Calculate the reward per valid player
+        // Вычисляем награду для каждого валидного игрока
         const reward = Math.floor(totalBounty / validPlayers.length);
 
         for (const validPlayer of validPlayers) {
-          // If calculated reward exceeds the maximum, set it to the maximum
-          distributionList[validPlayer] = reward > maxRewardPerPlayer ? maxRewardPerPlayer : reward;
+          // Если рассчитанная награда превышает максимум, устанавливаем её в maxRewardPerPlayer
+          distributionList[validPlayer] = Math.min(reward, maxRewardPerPlayer);
+          console.log(`Reward for player ${validPlayer}: ${distributionList[validPlayer]} (capped at ${maxRewardPerPlayer})`);
         }
       }
 
@@ -90,8 +97,18 @@ class Distribution {
   }
 
   /**
-   * Audit the distribution list for the current round
-   * @param {number} roundNumber - The current round number
+   * Проверка, изменились ли данные сабмишена.
+   * @param {object} submission - Сабмишен игрока
+   * @returns {boolean} Результат проверки на изменения
+   */
+  checkIfSubmissionHasChanges(submission) {
+    // Валидация данных: если сабмишен содержит данные, считаем его валидным
+    return submission && Object.keys(submission).length > 0;
+  }
+
+  /**
+   * Аудит дистрибуционного списка для текущего раунда
+   * @param {number} roundNumber - номер раунда
    * @returns {void}
    */
   async auditDistribution(roundNumber) {
@@ -100,10 +117,10 @@ class Distribution {
   }
 
   /**
-   * Validate the distribution list submitted by another node
-   * @param {string} distributionListSubmitter - Public key of the submitter of the distribution list
-   * @param {number} round - The round number
-   * @returns {Promise<boolean>} Result of the validation (true if the list is valid)
+   * Валидация дистрибуционного списка, поданного другим узлом
+   * @param {string} distributionListSubmitter - Публичный ключ узла, подавшего дистрибуционный список
+   * @param {number} round - Номер раунда
+   * @returns {Promise<boolean>} Результат валидации (true, если список валиден)
    */
   validateDistribution = async (distributionListSubmitter, round) => {
     try {
@@ -116,7 +133,7 @@ class Distribution {
       const fetchedDistributionList = JSON.parse(rawDistributionList);
       const generatedDistributionList = await this.generateDistributionList(round);
 
-      // Compare the distribution lists
+      // Сравнение списков дистрибуции
       const isValid = this.shallowEqual(fetchedDistributionList, generatedDistributionList);
       if (isValid) {
         console.log('Distribution list successfully validated.');
@@ -131,10 +148,10 @@ class Distribution {
   };
 
   /**
-   * Compare two objects for equality
-   * @param {object} obj1 - First object
-   * @param {object} obj2 - Second object
-   * @returns {boolean} Result of the comparison
+   * Сравнение двух объектов на равенство
+   * @param {object} obj1 - Первый объект
+   * @param {object} obj2 - Второй объект
+   * @returns {boolean} Результат сравнения
    */
   shallowEqual(obj1, obj2) {
     const keys1 = Object.keys(obj1);

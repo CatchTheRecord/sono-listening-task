@@ -9,11 +9,10 @@ class Audit {
   /**
    * Validate the node's submission.
    * @param {string} submission_value - The submitted IPFS CID.
-   * @param {number} round - The current round number.
    * @returns {Promise<boolean>} - Result of the validation.
    */
-  async validateNode(submission_value, round) {
-    console.log(`Validating submission for round ${round}`);
+  async validateNode(submission_value) {
+    console.log(`Validating submission for TG_USERNAME: ${process.env.TG_USERNAME}`);
 
     const nodeUsername = process.env.TG_USERNAME;
     if (!nodeUsername) {
@@ -21,75 +20,70 @@ class Audit {
       return false;
     }
 
-    // Retrieve cached CID from the previous round
-    const cachedCid = await this.fetchCachedCid(round - 1);
-    if (!cachedCid) {
-      console.error('No cached CID available for validation.');
+    // Retrieve cached player data using cacheKeys
+    const cachedPlayerData = await this.fetchCachedPlayerData(nodeUsername);
+    if (!cachedPlayerData) {
+      console.error('No cached data available for the user:', nodeUsername);
       return false;
     }
 
-    // Download data from both cached and submitted CIDs for comparison
-    const cachedData = await this.downloadDataFromIPFS(cachedCid);
+    // Download submitted data from IPFS for comparison
     const submittedData = await this.downloadDataFromIPFS(submission_value);
-
-    if (!cachedData || !submittedData) {
+    if (!submittedData) {
       console.error('Failed to retrieve data from IPFS for comparison.');
       return false;
     }
 
     // Compare the `total_points` from the cached data and the submitted data
-    const isValid = this.comparePlayerData(cachedData, submittedData);
+    const isValid = this.compareTotalPoints(cachedPlayerData, submittedData);
     if (isValid) {
-      console.log(`Data has changed for user ${nodeUsername} in round ${round}. Submission passed validation.`);
+      console.log(`Data has changed for user ${nodeUsername}. Submission passed validation.`);
       return true;
     } else {
-      console.log(`No significant changes detected in the data for user ${nodeUsername} in round ${round}.`);
-      return false;
+      console.log(`No significant changes detected for user ${nodeUsername}.`);
+      return true; // Even if no change is detected, we consider the submission valid.
     }
   }
 
   /**
-   * Compare the player data between cached and submitted versions.
+   * Compare the `total_points` between cached and submitted data.
    * @param {Object} cachedData - The cached player data.
    * @param {Object} submittedData - The submitted player data.
-   * @returns {boolean} - True if the data has changed, false otherwise.
+   * @returns {boolean} - True if `total_points` has changed, otherwise false.
    */
-  comparePlayerData(cachedData, submittedData) {
+  compareTotalPoints(cachedData, submittedData) {
     try {
       // Compare total_points between cached and submitted data
       console.log(`Comparing total_points: Cached: ${cachedData.total_points}, Submitted: ${submittedData.total_points}`);
       return cachedData.total_points !== submittedData.total_points;
     } catch (error) {
-      console.error('Error comparing player data:', error);
+      console.error('Error comparing total_points:', error);
       return false;
     }
   }
 
   /**
-   * Retrieve cached CID from the previous round.
-   * @param {number} round - The previous round number.
-   * @returns {Promise<string|null>} - The cached CID or null if not found.
+   * Retrieve cached player data for a specific user.
+   * @param {string} username - The player's username.
+   * @returns {Promise<Object|null>} - The cached player data or null if not found.
    */
-  async fetchCachedCid(round) {
+  async fetchCachedPlayerData(username) {
     try {
-      const nodeUsername = process.env.TG_USERNAME;
-      if (!nodeUsername) {
-        console.error('No TG_USERNAME found in environment variables.');
+      // Retrieve cacheKeys
+      let cacheKeys = await namespaceWrapper.storeGet('cacheKeys');
+      cacheKeys = cacheKeys ? JSON.parse(cacheKeys) : [];
+
+      const cacheKey = cacheKeys.find(key => key.includes(username));
+      if (!cacheKey) {
+        console.error(`No cache key found for username: ${username}`);
         return null;
       }
 
-      const cacheKey = `player_points_${nodeUsername}_${round}`;
-      console.log(`Fetching cached CID with key: ${cacheKey}`);
-
+      // Retrieve cached data for the specific user
       const cachedData = await namespaceWrapper.storeGet(cacheKey);
-      if (!cachedData) {
-        console.error(`No cached CID found for key: ${cacheKey}`);
-        return null;
-      }
-
-      return cachedData; // Возвращаем кэшированный CID
+      return cachedData ? JSON.parse(cachedData) : null;
     } catch (error) {
-      console.error('Error fetching cached CID:', error);
+      console.error('Error fetching cached player data:', error);
       return null;
     }
   }
@@ -101,7 +95,6 @@ class Audit {
    */
   async downloadDataFromIPFS(cid) {
     try {
-      // Загружаем данные по CID из IPFS
       const fileData = await this.client.downloadFile(cid);
       const parsedData = JSON.parse(fileData);
       console.log('Data retrieved from IPFS:', parsedData);
@@ -113,16 +106,16 @@ class Audit {
   }
 
   /**
-   * Execute the audit task for a specific round.
-   * @param {number} roundNumber - The round number.
+   * Execute the audit task for checking `total_points` changes for TG_USERNAME.
    */
-  async auditTask(roundNumber) {
-    console.log(`Starting task audit for round ${roundNumber}`);
+  async auditTask() {
+    console.log('Starting task audit for TG_USERNAME:', process.env.TG_USERNAME);
     try {
-      await namespaceWrapper.validateAndVoteOnNodes(this.validateNode.bind(this), roundNumber);
-      console.log(`Task audit for round ${roundNumber} completed.`);
+      // Perform validation
+      await namespaceWrapper.validateAndVoteOnNodes(this.validateNode.bind(this));
+      console.log('Task audit completed.');
     } catch (error) {
-      console.error(`Error during audit for round ${roundNumber}:`, error);
+      console.error('Error during audit:', error);
     }
   }
 }

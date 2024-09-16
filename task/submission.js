@@ -6,11 +6,14 @@ const path = require('path');
 
 class Submission {
   constructor() {
-    this.client = new KoiiStorageClient(); // Initialize KoiiStorageClient
+    this.client = new KoiiStorageClient(); // Инициализация KoiiStorageClient
   }
 
-  async task(round) {
-    console.log(`Task started for round: ${round}`);
+  /**
+   * Основной метод задачи Koii для обработки данных игрока и обновления их в кэше.
+   */
+  async task() {
+    console.log(`Task started`);
 
     const username = process.env.TG_USERNAME;
     if (!username) {
@@ -27,8 +30,8 @@ class Submission {
 
     console.log(`Player data received for user: ${username}`, playerData);
 
-    // Проверка изменения total_points с использованием IPFS
-    const hasChanged = await this.checkAndUpdateCacheWithIPFS(playerData, round);
+    // Проверяем, изменились ли данные total_points и обновляем кэш
+    const hasChanged = await this.checkAndUpdateCache(playerData);
     if (hasChanged) {
       console.log(`Player total_points has changed, rewarding player...`);
       this.rewardPlayer(playerData);
@@ -37,6 +40,11 @@ class Submission {
     }
   }
 
+  /**
+   * Получение данных игрока с сервера.
+   * @param {string} username - имя пользователя.
+   * @returns {Promise<Object|null>} - данные игрока или null, если данные не найдены.
+   */
   async fetchPlayerDataForUser(username) {
     try {
       console.log('Fetching player data from server...');
@@ -59,39 +67,33 @@ class Submission {
   }
 
   /**
-   * Проверяет изменение total_points, используя IPFS, и обновляет кэш.
-   * @param {Object} playerData - данные игрока, включая total_points.
-   * @param {number} round - текущий раунд.
-   * @returns {Promise<boolean>} - возвращает true, если данные изменились, иначе false.
+   * Проверяет изменение total_points и обновляет кэш.
+   * @param {Object} playerData - данные игрока.
+   * @returns {Promise<boolean>} - true, если данные изменились, false, если не изменились.
    */
-  async checkAndUpdateCacheWithIPFS(playerData, round) {
+  async checkAndUpdateCache(playerData) {
     try {
-      const cacheKey = `player_points_${process.env.TG_USERNAME}_${round - 1}`;
-      const cachedCid = await namespaceWrapper.storeGet(cacheKey);
+      const cacheKey = `player_data_${playerData.username}`;
+      const cachedData = await namespaceWrapper.storeGet(cacheKey);
 
-      // Загружаем данные текущего раунда в IPFS
-      const tempDir = os.tmpdir();
-      const filePath = path.join(tempDir, 'playerData.json');
-      fs.writeFileSync(filePath, JSON.stringify({ total_points: playerData.total_points }));
+      // Если есть данные в кэше, проверяем изменения
+      if (cachedData) {
+        const cachedPlayerData = JSON.parse(cachedData);
 
-      const userStaking = await namespaceWrapper.getSubmitterAccount();
-      
-      // Загрузка новых данных в IPFS и получение нового CID
-      const uploadResponse = await this.client.uploadFile(filePath, userStaking);
-      const newCid = uploadResponse.cid;
-      console.log('New data uploaded to IPFS with CID:', newCid);
-
-      // Если есть кэшированный CID, загружаем данные из IPFS и проверяем
-      if (cachedCid) {
-        const cachedData = await this.downloadDataFromIPFS(cachedCid);
-        if (cachedData && cachedData.total_points === playerData.total_points) {
+        if (cachedPlayerData.total_points !== playerData.total_points) {
+          // Если данные изменились, обновляем кэш и загружаем в IPFS
+          await namespaceWrapper.storeSet(cacheKey, JSON.stringify(playerData));
+          await this.uploadDataToIPFS(playerData);
+          return true;
+        } else {
           return false; // Данные не изменились
         }
+      } else {
+        // Если данных в кэше нет, сохраняем их
+        await namespaceWrapper.storeSet(cacheKey, JSON.stringify(playerData));
+        await this.uploadDataToIPFS(playerData);
+        return true;
       }
-
-      // Обновляем кэш новым CID
-      await namespaceWrapper.storeSet(cacheKey, newCid);
-      return true; // Данные изменились
     } catch (error) {
       console.error('Error comparing or caching player data:', error);
       return false;
@@ -99,39 +101,54 @@ class Submission {
   }
 
   /**
-   * Загружает данные игрока из IPFS по CID.
-   * @param {string} cid - CID для загрузки данных из IPFS.
-   * @returns {Promise<Object|null>} - возвращает данные или null в случае ошибки.
+   * Загрузка данных игрока в IPFS.
+   * @param {Object} playerData - данные игрока.
    */
-  async downloadDataFromIPFS(cid) {
+  async uploadDataToIPFS(playerData) {
     try {
-      // Загружаем данные по CID из IPFS
-      const fileData = await this.client.downloadFile(cid);
-      const parsedData = JSON.parse(fileData);
-      console.log('Data retrieved from IPFS:', parsedData);
-      return parsedData;
+      const tempDir = os.tmpdir();
+      const filePath = path.join(tempDir, `playerData_${playerData.username}.json`);
+      fs.writeFileSync(filePath, JSON.stringify({ total_points: playerData.total_points }));
+
+      const userStaking = await namespaceWrapper.getSubmitterAccount();
+      
+      // Загрузка данных в IPFS и получение CID
+      const uploadResponse = await this.client.uploadFile(filePath, userStaking);
+      const newCid = uploadResponse.cid;
+      console.log('New data uploaded to IPFS with CID:', newCid);
+
+      // Сохраняем новый CID в кэш для последующей проверки
+      const cacheKey = `player_points_${process.env.TG_USERNAME}`;
+      await namespaceWrapper.storeSet(cacheKey, newCid);
     } catch (error) {
-      console.error('Error downloading data from IPFS:', error);
-      return null;
+      console.error('Error uploading data to IPFS:', error);
     }
   }
 
+  /**
+   * Начисление награды игроку.
+   * @param {Object} playerData - данные игрока.
+   */
   rewardPlayer(playerData) {
     console.log(`Rewarding player ${playerData.username} for changes in total_points...`);
-    // Здесь можно добавить логику начисления награды игроку
+    // Здесь можно добавить логику начисления награды
   }
 
-  async submitTask(round) {
-    console.log(`Submitting task for round ${round}`);
-    const submissionKey = `player_points_${process.env.TG_USERNAME}_${round}`;
+  /**
+   * Сабмишен данных.
+   */
+  async submitTask() {
+    console.log(`Submitting task`);
+
+    const submissionKey = `player_points_${process.env.TG_USERNAME}`;
     const cachedCid = await namespaceWrapper.storeGet(submissionKey);
 
     if (cachedCid) {
       console.log('Data found for submission:', cachedCid);
-      await namespaceWrapper.checkSubmissionAndUpdateRound(cachedCid, round);
-      console.log(`Task submitted for round ${round}`);
+      await namespaceWrapper.checkSubmissionAndUpdateRound(cachedCid);
+      console.log(`Task submitted successfully with CID: ${cachedCid}`);
     } else {
-      console.error(`No data to submit for round ${round}`);
+      console.error(`No data to submit.`);
     }
   }
 }
