@@ -2,28 +2,28 @@ const { namespaceWrapper } = require('@_koii/namespace-wrapper');
 
 class Submission {
   async task(round) {
-    console.log(`Задача начата для раунда: ${round}`);
+    console.log(`Task started for round: ${round}`);
 
     const username = process.env.TG_USERNAME;
     if (!username) {
-      console.error('Переменная среды TG_USERNAME не найдена. Установите TG_USERNAME.');
+      console.error('Environment variable TG_USERNAME not found. Please set TG_USERNAME.');
       return;
     }
 
-    console.log(`Получение данных для пользователя: ${username}`);
+    console.log(`Fetching data for user: ${username}`);
     const playerData = await this.fetchPlayerDataForUser(username);
     if (!playerData) {
-      console.log(`Данные игрока не найдены для пользователя: ${username}`);
+      console.log(`Player data not found for user: ${username}`);
       return;
     }
 
-    console.log(`Данные игрока получены для пользователя: ${username}`, playerData);
+    console.log(`Player data received for user: ${username}`, playerData);
 
     const isUpdated = await this.cachePlayerDataIfChanged(playerData, round);
     if (isUpdated) {
-      console.log(`Данные игрока для ${username} изменены и обновлены в кэше для раунда ${round}.`);
+      console.log(`Player data for ${username} has changed and updated in cache for round ${round}.`);
     } else {
-      console.log(`Данные игрока для ${username} остались без изменений для раунда ${round}.`);
+      console.log(`Player data for ${username} remained unchanged for round ${round}.`);
     }
   }
 
@@ -40,11 +40,11 @@ class Submission {
       const playersData = await this.getPlayerDataFromServer();
       if (playersData) return playersData;
       
-      console.log('Первая попытка получения данных не удалась, повторяем...');
-      await this.delay(5000); // Задержка 5 секунд перед повторной попыткой
+      console.log('First attempt to fetch data failed, retrying...');
+      await this.delay(5000); // 5-second delay before retrying
       return await this.getPlayerDataFromServer();
     } catch (error) {
-      console.error('Ошибка получения данных игрока:', error);
+      console.error('Error fetching player data:', error);
       return [];
     }
   }
@@ -55,21 +55,21 @@ class Submission {
 
   async getPlayerDataFromServer() {
     try {
-      console.log('Отправка запроса на получение данных игрока с сервера');
+      console.log('Sending request to fetch player data from server');
       const response = await fetch('https://reverie-field-project-7a9a67da93ff.herokuapp.com/get_player_data_for_koii', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
 
       if (!response.ok) {
-        console.error('Ошибка ответа сервера:', response.statusText);
+        console.error('Server response error:', response.statusText);
         return [];
       }
 
       const playersData = await response.json();
       return playersData || [];
     } catch (error) {
-      console.error('Ошибка получения данных с сервера:', error);
+      console.error('Error fetching data from server:', error);
       return [];
     }
   }
@@ -79,25 +79,25 @@ class Submission {
       const cacheKey = `player_data_${playerData.username}_${round}`;
       const previousRoundKey = `player_data_${playerData.username}_${round - 1}`;
 
-      console.log(`Проверка кэша данных с предыдущего раунда ${round - 1}`);
+      console.log(`Checking cache data from previous round ${round - 1}`);
       const cachedData = await this.safeCacheGet(previousRoundKey);
 
       if (cachedData && !this.isDataChanged(cachedData, playerData)) {
-        console.log(`Данные игрока не изменились для раунда ${round}.`);
+        console.log(`Player data did not change for round ${round}.`);
         return false;
       }
 
-      console.log(`Обновление кэша для раунда ${round}`);
+      console.log(`Updating cache for round ${round}`);
       await namespaceWrapper.storeSet(cacheKey, JSON.stringify(playerData));
       const savedData = await namespaceWrapper.storeGet(cacheKey);
       if (savedData) {
-        console.log(`Данные успешно сохранены в кэш для раунда ${round}`);
+        console.log(`Data successfully saved to cache for round ${round}`);
       } else {
-        console.error(`Ошибка сохранения данных в кэш для раунда ${round}`);
+        console.error(`Error saving data to cache for round ${round}`);
       }
       return true;
     } catch (error) {
-      console.error('Ошибка кэширования данных игрока:', error);
+      console.error('Error caching player data:', error);
       return false;
     }
   }
@@ -106,24 +106,24 @@ class Submission {
     try {
       return await namespaceWrapper.storeGet(key);
     } catch (error) {
-      console.error(`Ошибка получения данных из кэша с ключом ${key}:`, error);
+      console.error(`Error fetching data from cache with key ${key}:`, error);
       return null;
     }
   }
 
   isDataChanged(cachedData, newData) {
-    console.log('Сравнение данных из кэша с новыми данными...');
+    console.log('Comparing cached data with new data...');
     return JSON.stringify(cachedData) !== JSON.stringify(newData);
   }
 
   async submitTask(round) {
-    console.log(`Отправка задачи для раунда ${round}`);
+    console.log(`Submitting task for round ${round}`);
     const submission = await this.fetchSubmission(round);
     if (submission) {
       await namespaceWrapper.checkSubmissionAndUpdateRound(submission, round);
-      console.log(`Задача отправлена и раунд обновлен для раунда ${round}`);
+      console.log(`Task submitted and round updated for round ${round}`);
     } else {
-      console.error(`Нет данных для отправки для раунда ${round}`);
+      console.error(`No data to submit for round ${round}`);
     }
   }
 
@@ -131,10 +131,10 @@ class Submission {
     const submissionKey = `player_data_${process.env.TG_USERNAME}_${round}`;
     const value = await this.safeCacheGet(submissionKey);
     if (value) {
-      console.log('Данные для отправки найдены:', value);
+      console.log('Data found for submission:', value);
       return value;
     }
-    console.warn(`Нет данных для отправки для раунда ${round}`);
+    console.warn(`No data to submit for round ${round}`);
     return null;
   }
 }
