@@ -51,8 +51,12 @@ class Submission {
     const submission = await this.fetchSubmission(round);
     if (submission) {
       console.log('Data found for submission:', submission);
-      await namespaceWrapper.checkSubmissionAndUpdateRound(submission, round);
-      console.log(`Task submitted successfully with CID: ${submission}`);
+      try {
+        await namespaceWrapper.checkSubmissionAndUpdateRound(submission, round);
+        console.log(`Task submitted successfully with CID: ${submission}`);
+      } catch (error) {
+        console.error(`Failed to submit task for round ${round}. Error:`, error);
+      }
     } else {
       console.error(`No data to submit for round ${round}.`);
     }

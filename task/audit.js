@@ -29,6 +29,7 @@ class Audit {
         console.error('No cached data available for the user:', nodeUsername);
         return false;
       }
+      console.log('Cached player data:', cachedPlayerData);
 
       // Загрузка данных из IPFS для валидации
       const submittedData = await this.downloadDataFromIPFS(submission_value);
@@ -36,6 +37,7 @@ class Audit {
         console.error('Failed to retrieve data from IPFS for comparison.');
         return false;
       }
+      console.log('Submitted data from IPFS:', submittedData);
 
       // Сравнение данных total_points между кешем и сабмишеном
       const isValid = this.compareTotalPoints(cachedPlayerData, submittedData);
@@ -80,7 +82,11 @@ class Audit {
     try {
       const cacheKey = `player_data_${username}_round_${round}`;
       const cachedData = await namespaceWrapper.storeGet(cacheKey);
-      return cachedData ? JSON.parse(cachedData) : null;
+      if (!cachedData) {
+        console.log(`No cached data found for key: ${cacheKey}`);
+        return null;
+      }
+      return JSON.parse(cachedData);
     } catch (error) {
       console.error('Error fetching cached player data:', error);
       return null;
