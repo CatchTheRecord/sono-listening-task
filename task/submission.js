@@ -125,6 +125,15 @@ class Submission {
           console.log(`Player data has changed. Updating cache for round ${round} with key: ${cacheKey}`);
           await namespaceWrapper.storeSet(cacheKey, JSON.stringify(playerData));
           await this.logCacheSetSuccess(cacheKey); // Log successful cache set
+
+          // Log for verifying that the data is correctly saved
+          const savedData = await namespaceWrapper.storeGet(cacheKey);
+          if (savedData) {
+            console.log(`Verified saved data for round ${round}:`, JSON.parse(savedData));
+          } else {
+            console.error(`Failed to verify saved data for round ${round}`);
+          }
+
           return true; // Data changed and was updated
         } else {
           console.log(`Player data has not changed for round ${round}.`);
@@ -135,6 +144,15 @@ class Submission {
         // If no data for the previous round is cached, store the current data
         await namespaceWrapper.storeSet(cacheKey, JSON.stringify(playerData));
         await this.logCacheSetSuccess(cacheKey); // Log successful cache set
+
+        // Log for verifying that the data is correctly saved
+        const savedData = await namespaceWrapper.storeGet(cacheKey);
+        if (savedData) {
+          console.log(`Verified saved data for round ${round}:`, JSON.parse(savedData));
+        } else {
+          console.error(`Failed to verify saved data for round ${round}`);
+        }
+
         return true; // New data was saved
       }
     } catch (error) {
