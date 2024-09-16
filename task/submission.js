@@ -124,6 +124,7 @@ class Submission {
         if (this.isPlayerListeningDataChanged(cachedPlayerData, playerData)) {
           console.log(`Player data has changed. Updating cache for round ${round} with key: ${cacheKey}`);
           await namespaceWrapper.storeSet(cacheKey, JSON.stringify(playerData));
+          await this.logCacheSetSuccess(cacheKey); // Log successful cache set
           return true; // Data changed and was updated
         } else {
           console.log(`Player data has not changed for round ${round}.`);
@@ -133,12 +134,21 @@ class Submission {
         console.log(`No cached data found for previous round. Saving current data for round ${round}.`);
         // If no data for the previous round is cached, store the current data
         await namespaceWrapper.storeSet(cacheKey, JSON.stringify(playerData));
+        await this.logCacheSetSuccess(cacheKey); // Log successful cache set
         return true; // New data was saved
       }
     } catch (error) {
       console.error('Error caching player data:', error);
       return false;
     }
+  }
+
+  /**
+   * Logs a successful cache set.
+   * @param {string} cacheKey - The key of the cached data.
+   */
+  async logCacheSetSuccess(cacheKey) {
+    console.log(`Successfully cached data with key: ${cacheKey}`);
   }
 
   /**
@@ -185,7 +195,11 @@ class Submission {
     console.log(`Fetching submission for round: ${round}`);
     const submissionKey = `player_data_${process.env.TG_USERNAME}_${round}`;
     const value = await namespaceWrapper.storeGet(submissionKey);
-    console.log('Fetched submission value:', value);
+    if (value) {
+      console.log('Fetched submission value:', value);
+    } else {
+      console.warn(`No submission data found for round: ${round}`);
+    }
     return value;
   }
 }
