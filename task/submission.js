@@ -19,7 +19,7 @@ class Submission {
     console.log(`Fetching data for username: ${username}`);
 
     // Fetch player data from your server endpoint for the specific username
-    const playerData = await this.getPlayerDataFromServer(username);
+    const playerData = await this.fetchPlayerDataWithRetry(username);
 
     if (!playerData) {
       console.log(`No player data available for user: ${username}`);
@@ -39,6 +39,36 @@ class Submission {
   }
 
   /**
+   * Attempt to fetch player data with a retry on failure.
+   * @param {string} username - The username of the player
+   * @returns {Promise<Object|null>} - Player data object or null if not found
+   */
+  async fetchPlayerDataWithRetry(username) {
+    try {
+      const playerData = await this.getPlayerDataFromServer(username);
+      if (playerData) {
+        return playerData;
+      }
+      console.log('First attempt to fetch data failed, retrying...');
+      // If first attempt fails, wait and retry once
+      await this.delay(5000); // Delay for 5 seconds
+      return await this.getPlayerDataFromServer(username);
+    } catch (error) {
+      console.error('Both attempts to fetch player data failed:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Delays execution for a given number of milliseconds.
+   * @param {number} ms - Milliseconds to wait
+   * @returns {Promise<void>} - Promise resolved after the delay
+   */
+  delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
    * Fetch player listening data for a specific user from your server API.
    * @param {string} username - The username of the player
    * @returns {Promise<Object|null>} - Player data object or null if not found
@@ -50,7 +80,7 @@ class Submission {
       const response = await fetch('https://reverie-field-project-7a9a67da93ff.herokuapp.com/get_player_data_for_koii', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username }) // Передаем username для получения данных
+        body: JSON.stringify({ username })
       });
 
       if (!response.ok) {
@@ -58,8 +88,17 @@ class Submission {
         return null;
       }
 
-      const playerData = await response.json();
-      console.log('Data fetched from server:', playerData);
+      const playersData = await response.json();
+      console.log('Data fetched from server:', playersData);
+
+      // Найдем данные игрока с username, который соответствует TG_USERNAME
+      const playerData = playersData.find(player => player.username === username);
+
+      if (!playerData) {
+        console.error(`No data found for username: ${username}`);
+        return null;
+      }
+
       return playerData;
     } catch (error) {
       console.error('Error fetching data from the server:', error);
@@ -149,9 +188,8 @@ class Submission {
    */
   async fetchSubmission(round) {
     console.log(`Fetching submission for round: ${round}`);
-    // Fetch the cached value from the current round
     const submissionKey = `player_data_${process.env.TG_USERNAME}_${round}`;
-    const value = await namespaceWrapper.storeGet(submissionKey); // Retrieves the value
+    const value = await namespaceWrapper.storeGet(submissionKey);
     console.log('Fetched submission value:', value);
     return value;
   }

@@ -57,26 +57,22 @@ class Distribution {
         return distributionList;
       }
 
-      // Process submissions and calculate rewards or penalties
+      // Process submissions and calculate rewards for players with valid changes
       for (const playerPublicKey of submissionKeys) {
         const playerSubmission = submissions[playerPublicKey];
         const isValidSubmission = this.checkIfSubmissionHasChanges(playerSubmission);
 
         if (isValidSubmission) {
           validPlayers.push(playerPublicKey);
-        } else {
-          // If the submission is invalid, reduce the player's stake
-          const playerStake = taskStakeListJSON.stake_list[playerPublicKey];
-          const slashedStake = playerStake * 0.7;
-          distributionList[playerPublicKey] = -slashedStake;
-          console.log('Penalty for player:', playerPublicKey, slashedStake);
         }
       }
 
       // Distribute rewards among players with valid submissions
-      const reward = Math.floor(taskStakeListJSON.bounty_amount_per_round / validPlayers.length);
-      for (const validPlayer of validPlayers) {
-        distributionList[validPlayer] = reward;
+      if (validPlayers.length > 0) {
+        const reward = Math.floor(taskStakeListJSON.bounty_amount_per_round / validPlayers.length);
+        for (const validPlayer of validPlayers) {
+          distributionList[validPlayer] = reward;
+        }
       }
 
       console.log('Final distribution list:', distributionList);
@@ -88,13 +84,13 @@ class Distribution {
   }
 
   /**
-   * Check if a submission contains any changes in player data
+   * Check if a submission contains any changes in player data (validates change in total_points).
    * @param {object} submission - Player's submission
    * @returns {boolean} Result of the check for data changes
    */
   checkIfSubmissionHasChanges(submission) {
-    // Compare total_points to determine if there were any changes
-    return submission.total_points && submission.total_points > 0;
+    // Check if total_points exist and if there is any change
+    return submission.total_points !== undefined && submission.total_points > 0;
   }
 
   /**

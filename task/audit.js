@@ -36,15 +36,15 @@ class Audit {
       }
 
       // Validate the submission value (expected to be total_points or activity data)
-      const isValid = this.hasChanges(cachedData, submission_value);
+      const isValid = this.hasPointsChanged(cachedData, submission_value);
 
       if (isValid) {
-        console.log(`Player's activity for user ${nodeUsername} has changed in round ${round}. Submission passed validation.`);
+        console.log(`Player's points for user ${nodeUsername} have changed in round ${round}. Submission passed validation.`);
       } else {
-        console.log(`No changes detected in player activity for user ${nodeUsername} in round ${round}. Submission passed validation.`);
+        console.log(`No changes detected in player points for user ${nodeUsername} in round ${round}. Submission passed validation.`);
       }
 
-      return true; // Consider it valid regardless of whether data changed
+      return isValid; // Consider valid if points changed
     } catch (error) {
       console.error('Error during validation:', error);
       return false;
@@ -52,12 +52,12 @@ class Audit {
   }
 
   /**
-   * Check if player data has changed (based on total_points or other activity).
+   * Check if player points have changed (based on total_points).
    * @param {Object} cachedData - Cached player data.
-   * @param {Object} submission_value - New data representing player's current activity (e.g., total_points).
-   * @returns {boolean} - True if data has changed, otherwise false.
+   * @param {Object} submission_value - New data representing player's current points (e.g., total_points).
+   * @returns {boolean} - True if points have changed, otherwise false.
    */
-  hasChanges(cachedData, submission_value) {
+  hasPointsChanged(cachedData, submission_value) {
     try {
       let submittedData;
       try {
@@ -67,14 +67,14 @@ class Audit {
         return false;
       }
 
-      console.log('Comparing cached data with submitted data:');
-      console.log('Cached data:', cachedData);
-      console.log('Submitted data:', submittedData);
+      console.log('Comparing cached total_points with submitted total_points:');
+      console.log('Cached total_points:', cachedData.total_points);
+      console.log('Submitted total_points:', submittedData.total_points);
 
       // Compare cached total_points with the submitted total_points
       return cachedData.total_points !== submittedData.total_points;
     } catch (error) {
-      console.error('Error comparing data:', error);
+      console.error('Error comparing total_points:', error);
       return false;
     }
   }
