@@ -55,7 +55,7 @@ requirementsTags:
 
 # ONLY provide the task_id and migrationDescription if you are updating the task, otherwise leave blank.
 # Task_id: Previous task ID.
-task_id: 'HMBxffDy22ySA82wtMYkm492Vvm8kBvEJGMW4tNWjJYA'
+task_id: 'BmUhZXxgpTAqn1DMR6nT7JA7MktTk6ekgo6szByPZz7k'
 
 # Migration description: Provide the description for changes made in the new version of the task.
-migrationDescription: 'updated logic ipfs usage and fast for test'
+migrationDescription: 'big logic update'

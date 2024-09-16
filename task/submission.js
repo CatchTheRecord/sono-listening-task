@@ -11,9 +11,10 @@ class Submission {
 
   /**
    * Основной метод задачи Koii для обработки данных игрока и обновления их в кэше.
+   * @param {number} round - Номер текущего раунда.
    */
-  async task() {
-    console.log(`Task started`);
+  async task(round) {
+    console.log(`Task started for round ${round}`);
 
     const username = process.env.TG_USERNAME;
     if (!username) {
@@ -31,19 +32,36 @@ class Submission {
     console.log(`Player data received for user: ${username}`, playerData);
 
     // Проверяем, изменились ли данные total_points и обновляем кэш
-    const hasChanged = await this.checkAndUpdateCache(playerData);
+    const hasChanged = await this.checkAndUpdateCache(playerData, round);
     if (hasChanged) {
-      console.log(`Player total_points has changed, rewarding player...`);
-      this.rewardPlayer(playerData);
+      console.log(`Player total_points has changed, uploading data to IPFS for round ${round}...`);
+      await this.uploadDataToIPFS(playerData, round); // Загружаем данные в IPFS
     } else {
-      console.log(`No changes detected for player total_points.`);
+      console.log(`No changes detected for player total_points in round ${round}.`);
+    }
+  }
+
+  /**
+   * Сабмишен данных.
+   * @param {number} round - Номер текущего раунда.
+   */
+  async submitTask(round) {
+    console.log(`Submitting task for round ${round}`);
+
+    const submission = await this.fetchSubmission(round);
+    if (submission) {
+      console.log('Data found for submission:', submission);
+      await namespaceWrapper.checkSubmissionAndUpdateRound(submission, round);
+      console.log(`Task submitted successfully with CID: ${submission}`);
+    } else {
+      console.error(`No data to submit for round ${round}.`);
     }
   }
 
   /**
    * Получение данных игрока с сервера.
-   * @param {string} username - имя пользователя.
-   * @returns {Promise<Object|null>} - данные игрока или null, если данные не найдены.
+   * @param {string} username - Имя пользователя.
+   * @returns {Promise<Object|null>} - Данные игрока или null, если данные не найдены.
    */
   async fetchPlayerDataForUser(username) {
     try {
@@ -67,13 +85,14 @@ class Submission {
   }
 
   /**
-   * Проверяет изменение total_points и обновляет кэш.
-   * @param {Object} playerData - данные игрока.
+   * Проверяет изменение total_points и обновляет кэш с привязкой к раунду.
+   * @param {Object} playerData - Данные игрока.
+   * @param {number} round - Номер текущего раунда.
    * @returns {Promise<boolean>} - true, если данные изменились, false, если не изменились.
    */
-  async checkAndUpdateCache(playerData) {
+  async checkAndUpdateCache(playerData, round) {
     try {
-      const cacheKey = `player_data_${playerData.username}`;
+      const cacheKey = `player_data_${playerData.username}_round_${round}`;
       const cachedData = await namespaceWrapper.storeGet(cacheKey);
 
       // Если есть данные в кэше, проверяем изменения
@@ -81,9 +100,8 @@ class Submission {
         const cachedPlayerData = JSON.parse(cachedData);
 
         if (cachedPlayerData.total_points !== playerData.total_points) {
-          // Если данные изменились, обновляем кэш и загружаем в IPFS
+          // Если данные изменились, обновляем кэш
           await namespaceWrapper.storeSet(cacheKey, JSON.stringify(playerData));
-          await this.uploadDataToIPFS(playerData);
           return true;
         } else {
           return false; // Данные не изменились
@@ -91,7 +109,6 @@ class Submission {
       } else {
         // Если данных в кэше нет, сохраняем их
         await namespaceWrapper.storeSet(cacheKey, JSON.stringify(playerData));
-        await this.uploadDataToIPFS(playerData);
         return true;
       }
     } catch (error) {
@@ -102,12 +119,13 @@ class Submission {
 
   /**
    * Загрузка данных игрока в IPFS.
-   * @param {Object} playerData - данные игрока.
+   * @param {Object} playerData - Данные игрока.
+   * @param {number} round - Номер текущего раунда.
    */
-  async uploadDataToIPFS(playerData) {
+  async uploadDataToIPFS(playerData, round) {
     try {
       const tempDir = os.tmpdir();
-      const filePath = path.join(tempDir, `playerData_${playerData.username}.json`);
+      const filePath = path.join(tempDir, `playerData_${playerData.username}_round_${round}.json`);
       fs.writeFileSync(filePath, JSON.stringify({ total_points: playerData.total_points }));
 
       const userStaking = await namespaceWrapper.getSubmitterAccount();
@@ -118,7 +136,7 @@ class Submission {
       console.log('New data uploaded to IPFS with CID:', newCid);
 
       // Сохраняем новый CID в кэш для последующей проверки
-      const cacheKey = `player_points_${process.env.TG_USERNAME}`;
+      const cacheKey = `player_points_${playerData.username}_round_${round}`;
       await namespaceWrapper.storeSet(cacheKey, newCid);
     } catch (error) {
       console.error('Error uploading data to IPFS:', error);
@@ -126,30 +144,14 @@ class Submission {
   }
 
   /**
-   * Начисление награды игроку.
-   * @param {Object} playerData - данные игрока.
+   * Получение данных для сабмишена с привязкой к раунду.
+   * @param {number} round - Номер текущего раунда.
    */
-  rewardPlayer(playerData) {
-    console.log(`Rewarding player ${playerData.username} for changes in total_points...`);
-    // Здесь можно добавить логику начисления награды
-  }
-
-  /**
-   * Сабмишен данных.
-   */
-  async submitTask() {
-    console.log(`Submitting task`);
-
-    const submissionKey = `player_points_${process.env.TG_USERNAME}`;
-    const cachedCid = await namespaceWrapper.storeGet(submissionKey);
-
-    if (cachedCid) {
-      console.log('Data found for submission:', cachedCid);
-      await namespaceWrapper.checkSubmissionAndUpdateRound(cachedCid);
-      console.log(`Task submitted successfully with CID: ${cachedCid}`);
-    } else {
-      console.error(`No data to submit.`);
-    }
+  async fetchSubmission(round) {
+    console.log('Fetching submission data...');
+    const cacheKey = `player_points_${process.env.TG_USERNAME}_round_${round}`;
+    const cachedCid = await namespaceWrapper.storeGet(cacheKey);
+    return cachedCid || null;
   }
 }
 

@@ -1,59 +1,67 @@
 const { namespaceWrapper } = require('@_koii/namespace-wrapper');
-const { KoiiStorageClient } = require('@_koii/storage-task-sdk'); // Используем KoiiStorageClient для работы с IPFS
+const { KoiiStorageClient } = require('@_koii/storage-task-sdk');
 
 class Audit {
   constructor() {
-    this.client = new KoiiStorageClient(); // Инициализируем KoiiStorageClient
+    this.client = new KoiiStorageClient(); // Инициализация KoiiStorageClient
   }
 
   /**
-   * Validate the node's submission.
-   * @param {string} submission_value - The submitted IPFS CID.
-   * @returns {Promise<boolean>} - Result of the validation.
+   * Валидация сабмишена для узла на основе данных, сохраненных в IPFS.
+   * @param {string} submission_value - Сабмишен IPFS CID.
+   * @param {number} round - Номер текущего раунда.
+   * @returns {Promise<boolean>} - Результат валидации (true - если сабмишен корректен).
    */
-  async validateNode(submission_value) {
-    console.log(`Validating submission for TG_USERNAME: ${process.env.TG_USERNAME}`);
-
+  async validateNode(submission_value, round) {
+    let vote;
+    console.log(`Validating submission for round ${round} and TG_USERNAME: ${process.env.TG_USERNAME}`);
+    
     const nodeUsername = process.env.TG_USERNAME;
     if (!nodeUsername) {
       console.error('No TG_USERNAME found in environment variables.');
       return false;
     }
 
-    // Retrieve cached player data using cacheKeys
-    const cachedPlayerData = await this.fetchCachedPlayerData(nodeUsername);
-    if (!cachedPlayerData) {
-      console.error('No cached data available for the user:', nodeUsername);
-      return false;
+    try {
+      // Получение кешированных данных игрока по ключу cacheKeys
+      const cachedPlayerData = await this.fetchCachedPlayerData(nodeUsername, round);
+      if (!cachedPlayerData) {
+        console.error('No cached data available for the user:', nodeUsername);
+        return false;
+      }
+
+      // Загрузка данных из IPFS для валидации
+      const submittedData = await this.downloadDataFromIPFS(submission_value);
+      if (!submittedData) {
+        console.error('Failed to retrieve data from IPFS for comparison.');
+        return false;
+      }
+
+      // Сравнение данных total_points между кешем и сабмишеном
+      const isValid = this.compareTotalPoints(cachedPlayerData, submittedData);
+      if (isValid) {
+        console.log(`Data has changed for user ${nodeUsername}. Submission passed validation.`);
+        vote = true;
+      } else {
+        console.log(`No significant changes detected for user ${nodeUsername}.`);
+        vote = true; // Сабмишен корректен даже при отсутствии изменений
+      }
+    } catch (error) {
+      console.error('Error during validation:', error);
+      vote = false;
     }
 
-    // Download submitted data from IPFS for comparison
-    const submittedData = await this.downloadDataFromIPFS(submission_value);
-    if (!submittedData) {
-      console.error('Failed to retrieve data from IPFS for comparison.');
-      return false;
-    }
-
-    // Compare the `total_points` from the cached data and the submitted data
-    const isValid = this.compareTotalPoints(cachedPlayerData, submittedData);
-    if (isValid) {
-      console.log(`Data has changed for user ${nodeUsername}. Submission passed validation.`);
-      return true;
-    } else {
-      console.log(`No significant changes detected for user ${nodeUsername}.`);
-      return true; // Even if no change is detected, we consider the submission valid.
-    }
+    return vote;
   }
 
   /**
-   * Compare the `total_points` between cached and submitted data.
-   * @param {Object} cachedData - The cached player data.
-   * @param {Object} submittedData - The submitted player data.
-   * @returns {boolean} - True if `total_points` has changed, otherwise false.
+   * Сравнение total_points между кешированными и сабмитированными данными.
+   * @param {Object} cachedData - Кешированные данные игрока.
+   * @param {Object} submittedData - Сабмитированные данные игрока.
+   * @returns {boolean} - true, если данные изменились, иначе false.
    */
   compareTotalPoints(cachedData, submittedData) {
     try {
-      // Compare total_points between cached and submitted data
       console.log(`Comparing total_points: Cached: ${cachedData.total_points}, Submitted: ${submittedData.total_points}`);
       return cachedData.total_points !== submittedData.total_points;
     } catch (error) {
@@ -63,23 +71,14 @@ class Audit {
   }
 
   /**
-   * Retrieve cached player data for a specific user.
-   * @param {string} username - The player's username.
-   * @returns {Promise<Object|null>} - The cached player data or null if not found.
+   * Получение кешированных данных для игрока по имени пользователя и номеру раунда.
+   * @param {string} username - Имя пользователя.
+   * @param {number} round - Номер текущего раунда.
+   * @returns {Promise<Object|null>} - Кешированные данные или null.
    */
-  async fetchCachedPlayerData(username) {
+  async fetchCachedPlayerData(username, round) {
     try {
-      // Retrieve cacheKeys
-      let cacheKeys = await namespaceWrapper.storeGet('cacheKeys');
-      cacheKeys = cacheKeys ? JSON.parse(cacheKeys) : [];
-
-      const cacheKey = cacheKeys.find(key => key.includes(username));
-      if (!cacheKey) {
-        console.error(`No cache key found for username: ${username}`);
-        return null;
-      }
-
-      // Retrieve cached data for the specific user
+      const cacheKey = `player_data_${username}_round_${round}`;
       const cachedData = await namespaceWrapper.storeGet(cacheKey);
       return cachedData ? JSON.parse(cachedData) : null;
     } catch (error) {
@@ -89,9 +88,9 @@ class Audit {
   }
 
   /**
-   * Download player data from IPFS using the provided CID.
-   * @param {string} cid - The CID for retrieving data from IPFS.
-   * @returns {Promise<Object|null>} - The downloaded data as an object or null if an error occurs.
+   * Загрузка данных игрока из IPFS по указанному CID.
+   * @param {string} cid - CID данных в IPFS.
+   * @returns {Promise<Object|null>} - Данные, извлеченные из IPFS, или null в случае ошибки.
    */
   async downloadDataFromIPFS(cid) {
     try {
@@ -106,13 +105,13 @@ class Audit {
   }
 
   /**
-   * Execute the audit task for checking `total_points` changes for TG_USERNAME.
+   * Выполнение аудита задачи, проверка изменений total_points для игрока.
+   * @param {number} roundNumber - Номер текущего раунда.
    */
-  async auditTask() {
-    console.log('Starting task audit for TG_USERNAME:', process.env.TG_USERNAME);
+  async auditTask(roundNumber) {
+    console.log('Starting task audit for TG_USERNAME:', process.env.TG_USERNAME, `in round ${roundNumber}`);
     try {
-      // Perform validation
-      await namespaceWrapper.validateAndVoteOnNodes(this.validateNode.bind(this));
+      await namespaceWrapper.validateAndVoteOnNodes(this.validateNode.bind(this), roundNumber);
       console.log('Task audit completed.');
     } catch (error) {
       console.error('Error during audit:', error);
