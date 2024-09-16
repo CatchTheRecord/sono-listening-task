@@ -57,10 +57,10 @@ class Distribution {
         return distributionList;
       }
 
-      // Process submissions and calculate rewards for players with valid CID changes
+      // Проходим по результатам аудита и добавляем в список ноды с изменившимися данными
       for (const playerPublicKey of submissionKeys) {
         const playerSubmission = submissions[playerPublicKey];
-        const isValidSubmission = await this.checkIfSubmissionHasChanges(playerSubmission);
+        const isValidSubmission = playerSubmission.is_valid; // Это значение должно быть результатом аудита, который проверяет изменения
 
         if (isValidSubmission) {
           validPlayers.push(playerPublicKey);
@@ -86,39 +86,6 @@ class Distribution {
     } catch (err) {
       console.error('Error generating distribution list:', err);
       return {};
-    }
-  }
-
-  /**
-   * Check if a submission contains any changes in player data using CID
-   * @param {object} submission - Player's submission
-   * @returns {Promise<boolean>} Result of the check for data changes
-   */
-  async checkIfSubmissionHasChanges(submission) {
-    try {
-      const playerCID = submission.cid; // Assuming `cid` is provided in the submission
-
-      // Fetch the previous CID from the cache
-      const cacheKey = `cid_${submission.username}_prev`;
-      const cachedCID = await namespaceWrapper.storeGet(cacheKey);
-
-      // If there's no cached CID, it's the first submission, so consider it a change
-      if (!cachedCID) {
-        await namespaceWrapper.storeSet(cacheKey, playerCID); // Cache the CID for future comparisons
-        return true;
-      }
-
-      // Compare the previous CID with the new one
-      if (cachedCID !== playerCID) {
-        await namespaceWrapper.storeSet(cacheKey, playerCID); // Update the cached CID if it changed
-        return true;
-      }
-
-      // CID hasn't changed, so no changes in data
-      return false;
-    } catch (error) {
-      console.error('Error checking submission changes:', error);
-      return false;
     }
   }
 

@@ -28,14 +28,41 @@ class Audit {
       return false;
     }
 
-    // Сравниваем текущий `CID` с кэшированным `CID`
-    if (cachedCid === submission_value) {
-      console.log(`No changes detected in the data for user ${nodeUsername} in round ${round}.`);
+    // Download data from both cached and submitted CIDs for comparison
+    const cachedData = await this.downloadDataFromIPFS(cachedCid);
+    const submittedData = await this.downloadDataFromIPFS(submission_value);
+
+    if (!cachedData || !submittedData) {
+      console.error('Failed to retrieve data from IPFS for comparison.');
       return false;
     }
 
-    console.log(`Data has changed for user ${nodeUsername} in round ${round}. Submission passed validation.`);
-    return true;
+    // Compare the `total_points` from the cached data and the submitted data
+    const isValid = this.comparePlayerData(cachedData, submittedData);
+    if (isValid) {
+      console.log(`Data has changed for user ${nodeUsername} in round ${round}. Submission passed validation.`);
+      return true;
+    } else {
+      console.log(`No significant changes detected in the data for user ${nodeUsername} in round ${round}.`);
+      return false;
+    }
+  }
+
+  /**
+   * Compare the player data between cached and submitted versions.
+   * @param {Object} cachedData - The cached player data.
+   * @param {Object} submittedData - The submitted player data.
+   * @returns {boolean} - True if the data has changed, false otherwise.
+   */
+  comparePlayerData(cachedData, submittedData) {
+    try {
+      // Compare total_points between cached and submitted data
+      console.log(`Comparing total_points: Cached: ${cachedData.total_points}, Submitted: ${submittedData.total_points}`);
+      return cachedData.total_points !== submittedData.total_points;
+    } catch (error) {
+      console.error('Error comparing player data:', error);
+      return false;
+    }
   }
 
   /**
@@ -63,6 +90,24 @@ class Audit {
       return cachedData; // Возвращаем кэшированный CID
     } catch (error) {
       console.error('Error fetching cached CID:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Download player data from IPFS using the provided CID.
+   * @param {string} cid - The CID for retrieving data from IPFS.
+   * @returns {Promise<Object|null>} - The downloaded data as an object or null if an error occurs.
+   */
+  async downloadDataFromIPFS(cid) {
+    try {
+      // Загружаем данные по CID из IPFS
+      const fileData = await this.client.downloadFile(cid);
+      const parsedData = JSON.parse(fileData);
+      console.log('Data retrieved from IPFS:', parsedData);
+      return parsedData;
+    } catch (error) {
+      console.error('Error downloading data from IPFS:', error);
       return null;
     }
   }

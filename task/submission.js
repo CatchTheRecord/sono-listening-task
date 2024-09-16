@@ -69,23 +69,27 @@ class Submission {
       const cacheKey = `player_points_${process.env.TG_USERNAME}_${round - 1}`;
       const cachedCid = await namespaceWrapper.storeGet(cacheKey);
 
+      // Загружаем данные текущего раунда в IPFS
       const tempDir = os.tmpdir();
       const filePath = path.join(tempDir, 'playerData.json');
       fs.writeFileSync(filePath, JSON.stringify({ total_points: playerData.total_points }));
 
       const userStaking = await namespaceWrapper.getSubmitterAccount();
-
-      // Загружаем текущие данные игрока в IPFS и получаем CID
+      
+      // Загрузка новых данных в IPFS и получение нового CID
       const uploadResponse = await this.client.uploadFile(filePath, userStaking);
       const newCid = uploadResponse.cid;
       console.log('New data uploaded to IPFS with CID:', newCid);
 
-      // Проверяем, изменился ли CID (данные total_points)
-      if (cachedCid && cachedCid === newCid) {
-        return false; // Данные не изменились
+      // Если есть кэшированный CID, загружаем данные из IPFS и проверяем
+      if (cachedCid) {
+        const cachedData = await this.downloadDataFromIPFS(cachedCid);
+        if (cachedData && cachedData.total_points === playerData.total_points) {
+          return false; // Данные не изменились
+        }
       }
 
-      // Обновляем кэш с новым CID
+      // Обновляем кэш новым CID
       await namespaceWrapper.storeSet(cacheKey, newCid);
       return true; // Данные изменились
     } catch (error) {
@@ -94,9 +98,27 @@ class Submission {
     }
   }
 
+  /**
+   * Загружает данные игрока из IPFS по CID.
+   * @param {string} cid - CID для загрузки данных из IPFS.
+   * @returns {Promise<Object|null>} - возвращает данные или null в случае ошибки.
+   */
+  async downloadDataFromIPFS(cid) {
+    try {
+      // Загружаем данные по CID из IPFS
+      const fileData = await this.client.downloadFile(cid);
+      const parsedData = JSON.parse(fileData);
+      console.log('Data retrieved from IPFS:', parsedData);
+      return parsedData;
+    } catch (error) {
+      console.error('Error downloading data from IPFS:', error);
+      return null;
+    }
+  }
+
   rewardPlayer(playerData) {
     console.log(`Rewarding player ${playerData.username} for changes in total_points...`);
-    // Логика начисления награды, если необходимо
+    // Здесь можно добавить логику начисления награды игроку
   }
 
   async submitTask(round) {
