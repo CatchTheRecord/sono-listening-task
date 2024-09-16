@@ -44,6 +44,9 @@ class Submission {
     } else {
       console.log(`Player data for ${playerData.username} remains unchanged for round ${round}.`);
     }
+
+    // Submit the data regardless of whether it has been updated or not
+    await this.submitTask(round);
   }
 
   /**
@@ -57,7 +60,6 @@ class Submission {
         return playersData;
       }
       console.log('First attempt to fetch data failed, retrying...');
-      // If first attempt fails, wait and retry once
       await this.delay(5000); // Delay for 5 seconds
       return await this.getPlayerDataFromServer();
     } catch (error) {
@@ -66,19 +68,10 @@ class Submission {
     }
   }
 
-  /**
-   * Delays execution for a given number of milliseconds.
-   * @param {number} ms - Milliseconds to wait
-   * @returns {Promise<void>} - Promise resolved after the delay
-   */
   delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  /**
-   * Fetch all players' listening data from your server API.
-   * @returns {Promise<Array>} - Array of player data
-   */
   async getPlayerDataFromServer() {
     try {
       console.log('Sending request to fetch player data from the server');
@@ -114,7 +107,7 @@ class Submission {
 
       console.log(`Checking for previous data from round ${round - 1} with key: ${previousRoundKey}`);
 
-      const cachedData = await this.safeCacheGet(previousRoundKey);  // Используем новый метод для безопасного извлечения
+      const cachedData = await this.safeCacheGet(previousRoundKey);
 
       if (cachedData) {
         const cachedPlayerData = JSON.parse(cachedData);
@@ -123,40 +116,36 @@ class Submission {
         // Compare total_points with the previous round: if changed, update the cache
         if (this.isPlayerListeningDataChanged(cachedPlayerData, playerData)) {
           console.log(`Player data has changed. Updating cache for round ${round} with key: ${cacheKey}`);
-          await namespaceWrapper.storeSet(cacheKey, JSON.stringify(playerData));
-          await this.logCacheSetSuccess(cacheKey); // Log successful cache set
-
-          // Log for verifying that the data is correctly saved
-          const savedData = await namespaceWrapper.storeGet(cacheKey);
-          if (savedData) {
-            console.log(`Verified saved data for round ${round}:`, JSON.parse(savedData));
-          } else {
-            console.error(`Failed to verify saved data for round ${round}`);
-          }
-
-          return true; // Data changed and was updated
+          return await this.updateCache(cacheKey, playerData);
         } else {
           console.log(`Player data has not changed for round ${round}.`);
-          return false; // Data remained the same
+          return false;
         }
       } else {
         console.log(`No cached data found for previous round. Saving current data for round ${round}.`);
-        // If no data for the previous round is cached, store the current data
-        await namespaceWrapper.storeSet(cacheKey, JSON.stringify(playerData));
-        await this.logCacheSetSuccess(cacheKey); // Log successful cache set
-
-        // Log for verifying that the data is correctly saved
-        const savedData = await namespaceWrapper.storeGet(cacheKey);
-        if (savedData) {
-          console.log(`Verified saved data for round ${round}:`, JSON.parse(savedData));
-        } else {
-          console.error(`Failed to verify saved data for round ${round}`);
-        }
-
-        return true; // New data was saved
+        return await this.updateCache(cacheKey, playerData);
       }
     } catch (error) {
       console.error('Error caching player data:', error);
+      return false;
+    }
+  }
+
+  async updateCache(cacheKey, playerData) {
+    try {
+      await namespaceWrapper.storeSet(cacheKey, JSON.stringify(playerData));
+      console.log(`Successfully cached data with key: ${cacheKey}`);
+
+      // Verify that data is saved
+      const savedData = await namespaceWrapper.storeGet(cacheKey);
+      if (savedData) {
+        console.log(`Verified saved data for key ${cacheKey}:`, JSON.parse(savedData));
+      } else {
+        console.error(`Failed to verify saved data for key ${cacheKey}`);
+      }
+      return true;
+    } catch (error) {
+      console.error(`Error updating cache for key ${cacheKey}:`, error);
       return false;
     }
   }
@@ -180,20 +169,6 @@ class Submission {
     }
   }
 
-  /**
-   * Logs a successful cache set.
-   * @param {string} cacheKey - The key of the cached data.
-   */
-  async logCacheSetSuccess(cacheKey) {
-    console.log(`Successfully cached data with key: ${cacheKey}`);
-  }
-
-  /**
-   * Check if player total_points have changed.
-   * @param {Object} cachedData - Cached data
-   * @param {Object} newData - New data
-   * @returns {boolean} - True if total_points changed, otherwise false
-   */
   isPlayerListeningDataChanged(cachedData, newData) {
     console.log('Comparing cached data with new data.');
     return cachedData.total_points !== newData.total_points;
@@ -223,21 +198,17 @@ class Submission {
     }
   }
 
-  /**
-   * Fetches the submission value
-   * @param {number} round - The current round number
-   * @returns {Promise<string>} The submission value that you will use in audit. It can be the real value, cid, etc.
-   */
   async fetchSubmission(round) {
     console.log(`Fetching submission for round: ${round}`);
     const submissionKey = `player_data_${process.env.TG_USERNAME}_${round}`;
-    const value = await this.safeCacheGet(submissionKey);  // Используем безопасное извлечение данных
+    const value = await this.safeCacheGet(submissionKey);
     if (value) {
       console.log('Fetched submission value:', value);
+      return value;
     } else {
       console.warn(`No submission data found for round: ${round}`);
+      return null;
     }
-    return value;
   }
 }
 
