@@ -67,11 +67,17 @@ class Distribution {
         }
       }
 
-      // Distribute rewards among players with valid submissions
+      // Calculate rewards and ensure maximum reward of 25 tokens per player
       if (validPlayers.length > 0) {
-        const reward = Math.floor(taskStakeListJSON.bounty_amount_per_round / validPlayers.length);
+        const totalBounty = taskStakeListJSON.bounty_amount_per_round;
+        const maxRewardPerPlayer = 25; // Set max reward limit to 25 tokens
+
+        // Calculate the reward per valid player
+        const reward = Math.floor(totalBounty / validPlayers.length);
+
         for (const validPlayer of validPlayers) {
-          distributionList[validPlayer] = reward;
+          // If calculated reward exceeds the maximum, set it to the maximum
+          distributionList[validPlayer] = reward > maxRewardPerPlayer ? maxRewardPerPlayer : reward;
         }
       }
 

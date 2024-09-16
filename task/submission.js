@@ -80,7 +80,7 @@ class Submission {
       const response = await fetch('https://reverie-field-project-7a9a67da93ff.herokuapp.com/get_player_data_for_koii', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username })
+        body: JSON.stringify({ username }) // Передаем только конкретного пользователя
       });
 
       if (!response.ok) {
@@ -88,13 +88,9 @@ class Submission {
         return null;
       }
 
-      const playersData = await response.json();
-      console.log('Data fetched from server:', playersData);
+      const playerData = await response.json();
 
-      // Найдем данные игрока с username, который соответствует TG_USERNAME
-      const playerData = playersData.find(player => player.username === username);
-
-      if (!playerData) {
+      if (!playerData || playerData.username !== username) {
         console.error(`No data found for username: ${username}`);
         return null;
       }
