@@ -7,13 +7,12 @@ class Audit {
   }
 
   /**
-   * Валидация сабмишена для узла на основе данных, сохраненных в IPFS.
+   * Валидация сабмишена для узла на основе данных, загруженных в IPFS.
    * @param {string} submission_value - Сабмишен IPFS CID.
    * @param {number} round - Номер текущего раунда.
    * @returns {Promise<boolean>} - Результат валидации (true - если сабмишен корректен).
    */
   async validateNode(submission_value, round) {
-    let vote;
     console.log(`Validating submission for round ${round} and TG_USERNAME: ${process.env.TG_USERNAME}`);
     
     const nodeUsername = process.env.TG_USERNAME;
@@ -23,49 +22,45 @@ class Audit {
     }
 
     try {
-      // Получение кешированных данных игрока по ключу cacheKeys
-      const cachedPlayerData = await this.fetchCachedPlayerData(nodeUsername, round);
-      if (!cachedPlayerData) {
-        console.error('No cached data available for the user:', nodeUsername);
-        return false;
-      }
-      console.log('Cached player data:', cachedPlayerData);
-
-      // Загрузка данных из IPFS для валидации
-      const submittedData = await this.downloadDataFromIPFS(submission_value);
-      if (!submittedData) {
+      // Загружаем данные из IPFS (предыдущие сабмишены)
+      const previousData = await this.downloadDataFromIPFS(submission_value);
+      if (!previousData) {
         console.error('Failed to retrieve data from IPFS for comparison.');
         return false;
       }
-      console.log('Submitted data from IPFS:', submittedData);
 
-      // Сравнение данных total_points между кешем и сабмишеном
-      const isValid = this.compareTotalPoints(cachedPlayerData, submittedData);
+      // Получаем свежие данные с сервера (эндпоинта)
+      const currentData = await this.fetchPlayerDataFromEndpoint(nodeUsername);
+      if (!currentData) {
+        console.error('No data found for user from endpoint:', nodeUsername);
+        return false;
+      }
+
+      // Сравниваем данные из IPFS и с эндпоинта
+      const isValid = this.compareTotalPoints(previousData, currentData);
       if (isValid) {
-        console.log(`Data has changed for user ${nodeUsername}. Submission passed validation.`);
-        vote = true;
+        console.log(`Total points have changed for user ${nodeUsername}. Submission is valid.`);
+        return true;  // Данные изменились, сабмишен валиден
       } else {
-        console.log(`No significant changes detected for user ${nodeUsername}.`);
-        vote = true; // Сабмишен корректен даже при отсутствии изменений
+        console.log(`No changes in total points for user ${nodeUsername}. Submission is invalid.`);
+        return false; // Данные не изменились, сабмишен не валиден
       }
     } catch (error) {
       console.error('Error during validation:', error);
-      vote = false;
+      return false;
     }
-
-    return vote;
   }
 
   /**
-   * Сравнение total_points между кешированными и сабмитированными данными.
-   * @param {Object} cachedData - Кешированные данные игрока.
-   * @param {Object} submittedData - Сабмитированные данные игрока.
+   * Сравнение total_points между текущими и сабмитированными данными.
+   * @param {Object} previousData - Данные из предыдущего сабмишена (IPFS).
+   * @param {Object} currentData - Текущие данные с эндпоинта.
    * @returns {boolean} - true, если данные изменились, иначе false.
    */
-  compareTotalPoints(cachedData, submittedData) {
+  compareTotalPoints(previousData, currentData) {
     try {
-      console.log(`Comparing total_points: Cached: ${cachedData.total_points}, Submitted: ${submittedData.total_points}`);
-      return cachedData.total_points !== submittedData.total_points;
+      console.log(`Comparing total_points: Previous: ${previousData.total_points}, Current: ${currentData.total_points}`);
+      return previousData.total_points !== currentData.total_points;
     } catch (error) {
       console.error('Error comparing total_points:', error);
       return false;
@@ -73,22 +68,27 @@ class Audit {
   }
 
   /**
-   * Получение кешированных данных для игрока по имени пользователя и номеру раунда.
+   * Получение данных игрока с эндпоинта.
    * @param {string} username - Имя пользователя.
-   * @param {number} round - Номер текущего раунда.
-   * @returns {Promise<Object|null>} - Кешированные данные или null.
+   * @returns {Promise<Object|null>} - Данные игрока или null.
    */
-  async fetchCachedPlayerData(username, round) {
+  async fetchPlayerDataFromEndpoint(username) {
     try {
-      const cacheKey = `player_data_${username}_round_${round}`;
-      const cachedData = await namespaceWrapper.storeGet(cacheKey);
-      if (!cachedData) {
-        console.log(`No cached data found for key: ${cacheKey}`);
+      console.log('Fetching player data from server...');
+      const response = await fetch('https://reverie-field-project-7a9a67da93ff.herokuapp.com/get_player_data_for_koii', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!response.ok) {
+        console.error('Failed to fetch player data:', response.statusText);
         return null;
       }
-      return JSON.parse(cachedData);
+
+      const playersData = await response.json();
+      return playersData.find(player => player.username === username) || null;
     } catch (error) {
-      console.error('Error fetching cached player data:', error);
+      console.error('Error fetching player data from endpoint:', error);
       return null;
     }
   }
