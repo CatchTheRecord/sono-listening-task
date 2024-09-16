@@ -114,7 +114,7 @@ class Submission {
 
       console.log(`Checking for previous data from round ${round - 1} with key: ${previousRoundKey}`);
 
-      const cachedData = await namespaceWrapper.storeGet(previousRoundKey);
+      const cachedData = await this.safeCacheGet(previousRoundKey);  // Используем новый метод для безопасного извлечения
 
       if (cachedData) {
         const cachedPlayerData = JSON.parse(cachedData);
@@ -140,6 +140,25 @@ class Submission {
     } catch (error) {
       console.error('Error caching player data:', error);
       return false;
+    }
+  }
+
+  /**
+   * Safe cache retrieval with error handling.
+   * @param {string} cacheKey - The key for the cached data.
+   * @returns {Promise<string|null>} - Cached data or null if not found.
+   */
+  async safeCacheGet(cacheKey) {
+    try {
+      const cachedData = await namespaceWrapper.storeGet(cacheKey);
+      if (!cachedData) {
+        console.log(`No cached data found for key: ${cacheKey}`);
+        return null;
+      }
+      return cachedData;
+    } catch (error) {
+      console.error(`Error retrieving cache for key ${cacheKey}:`, error);
+      return null;
     }
   }
 
@@ -194,7 +213,7 @@ class Submission {
   async fetchSubmission(round) {
     console.log(`Fetching submission for round: ${round}`);
     const submissionKey = `player_data_${process.env.TG_USERNAME}_${round}`;
-    const value = await namespaceWrapper.storeGet(submissionKey);
+    const value = await this.safeCacheGet(submissionKey);  // Используем безопасное извлечение данных
     if (value) {
       console.log('Fetched submission value:', value);
     } else {
