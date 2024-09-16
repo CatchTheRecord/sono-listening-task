@@ -57,10 +57,10 @@ class Distribution {
         return distributionList;
       }
 
-      // Process submissions and calculate rewards for players with valid changes
+      // Process submissions and calculate rewards for players with valid CID changes
       for (const playerPublicKey of submissionKeys) {
         const playerSubmission = submissions[playerPublicKey];
-        const isValidSubmission = this.checkIfSubmissionHasChanges(playerSubmission);
+        const isValidSubmission = await this.checkIfSubmissionHasChanges(playerSubmission);
 
         if (isValidSubmission) {
           validPlayers.push(playerPublicKey);
@@ -90,13 +90,36 @@ class Distribution {
   }
 
   /**
-   * Check if a submission contains any changes in player data (validates change in total_points).
+   * Check if a submission contains any changes in player data using CID
    * @param {object} submission - Player's submission
-   * @returns {boolean} Result of the check for data changes
+   * @returns {Promise<boolean>} Result of the check for data changes
    */
-  checkIfSubmissionHasChanges(submission) {
-    // Check if total_points exist and if there is any change
-    return submission.total_points !== undefined && submission.total_points > 0;
+  async checkIfSubmissionHasChanges(submission) {
+    try {
+      const playerCID = submission.cid; // Assuming `cid` is provided in the submission
+
+      // Fetch the previous CID from the cache
+      const cacheKey = `cid_${submission.username}_prev`;
+      const cachedCID = await namespaceWrapper.storeGet(cacheKey);
+
+      // If there's no cached CID, it's the first submission, so consider it a change
+      if (!cachedCID) {
+        await namespaceWrapper.storeSet(cacheKey, playerCID); // Cache the CID for future comparisons
+        return true;
+      }
+
+      // Compare the previous CID with the new one
+      if (cachedCID !== playerCID) {
+        await namespaceWrapper.storeSet(cacheKey, playerCID); // Update the cached CID if it changed
+        return true;
+      }
+
+      // CID hasn't changed, so no changes in data
+      return false;
+    } catch (error) {
+      console.error('Error checking submission changes:', error);
+      return false;
+    }
   }
 
   /**

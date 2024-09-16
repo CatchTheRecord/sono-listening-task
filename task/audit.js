@@ -1,9 +1,14 @@
 const { namespaceWrapper } = require('@_koii/namespace-wrapper');
+const { KoiiStorageClient } = require('@_koii/storage-task-sdk'); // Используем KoiiStorageClient для работы с IPFS
 
 class Audit {
+  constructor() {
+    this.client = new KoiiStorageClient(); // Инициализируем KoiiStorageClient
+  }
+
   /**
    * Validate the node's submission.
-   * @param {string} submission_value - The submitted value (points).
+   * @param {string} submission_value - The submitted IPFS CID.
    * @param {number} round - The current round number.
    * @returns {Promise<boolean>} - Result of the validation.
    */
@@ -16,51 +21,29 @@ class Audit {
       return false;
     }
 
-    // Retrieve cached player data from the previous round
-    const cachedData = await this.fetchCachedPlayerData(round - 1);
-    if (!cachedData) {
-      console.error('No cached data available for validation.');
+    // Retrieve cached CID from the previous round
+    const cachedCid = await this.fetchCachedCid(round - 1);
+    if (!cachedCid) {
+      console.error('No cached CID available for validation.');
       return false;
     }
 
-    // Compare the submission data with the cached data
-    const isValid = this.hasPointsChanged(cachedData, submission_value);
-    if (isValid) {
-      console.log(`Player's points have changed for user ${nodeUsername} in round ${round}. Submission passed validation.`);
-    } else {
-      console.log(`No changes in points for user ${nodeUsername} in round ${round}.`);
-    }
-
-    return isValid;
-  }
-
-  /**
-   * Check if player points have changed.
-   * @param {Object} cachedData - Cached player data from the previous round.
-   * @param {string} submission_value - The submitted data in JSON format.
-   * @returns {boolean} - True if points have changed, otherwise false.
-   */
-  hasPointsChanged(cachedData, submission_value) {
-    try {
-      const submittedData = JSON.parse(submission_value);
-
-      console.log('Comparing cached total_points with submitted total_points:');
-      console.log('Cached total_points:', cachedData.total_points);
-      console.log('Submitted total_points:', submittedData.total_points);
-
-      return cachedData.total_points !== submittedData.total_points;
-    } catch (error) {
-      console.error('Error comparing total_points:', error);
+    // Сравниваем текущий `CID` с кэшированным `CID`
+    if (cachedCid === submission_value) {
+      console.log(`No changes detected in the data for user ${nodeUsername} in round ${round}.`);
       return false;
     }
+
+    console.log(`Data has changed for user ${nodeUsername} in round ${round}. Submission passed validation.`);
+    return true;
   }
 
   /**
-   * Retrieve cached player data from the previous round.
+   * Retrieve cached CID from the previous round.
    * @param {number} round - The previous round number.
-   * @returns {Promise<Object|null>} - The cached player data or null if not found.
+   * @returns {Promise<string|null>} - The cached CID or null if not found.
    */
-  async fetchCachedPlayerData(round) {
+  async fetchCachedCid(round) {
     try {
       const nodeUsername = process.env.TG_USERNAME;
       if (!nodeUsername) {
@@ -68,18 +51,18 @@ class Audit {
         return null;
       }
 
-      const cacheKey = `player_data_${nodeUsername}_${round}`;
-      console.log(`Fetching cached data with key: ${cacheKey}`);
+      const cacheKey = `player_points_${nodeUsername}_${round}`;
+      console.log(`Fetching cached CID with key: ${cacheKey}`);
 
       const cachedData = await namespaceWrapper.storeGet(cacheKey);
       if (!cachedData) {
-        console.error(`No cached data found for key: ${cacheKey}`);
+        console.error(`No cached CID found for key: ${cacheKey}`);
         return null;
       }
 
-      return JSON.parse(cachedData);
+      return cachedData; // Возвращаем кэшированный CID
     } catch (error) {
-      console.error('Error fetching cached data:', error);
+      console.error('Error fetching cached CID:', error);
       return null;
     }
   }
