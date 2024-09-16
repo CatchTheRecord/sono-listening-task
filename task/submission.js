@@ -18,8 +18,16 @@ class Submission {
 
     console.log(`Fetching data for username: ${username}`);
 
-    // Fetch player data from your server endpoint for the specific username
-    const playerData = await this.fetchPlayerDataWithRetry(username);
+    // Fetch player data from your server endpoint
+    const playersData = await this.fetchPlayerDataWithRetry();
+
+    if (!playersData || playersData.length === 0) {
+      console.log('No player data available for processing.');
+      return;
+    }
+
+    // Фильтруем данные для конкретного пользователя
+    const playerData = playersData.find(player => player.username === username);
 
     if (!playerData) {
       console.log(`No player data available for user: ${username}`);
@@ -40,22 +48,21 @@ class Submission {
 
   /**
    * Attempt to fetch player data with a retry on failure.
-   * @param {string} username - The username of the player
-   * @returns {Promise<Object|null>} - Player data object or null if not found
+   * @returns {Promise<Array>} - Array of player data or null if not found
    */
-  async fetchPlayerDataWithRetry(username) {
+  async fetchPlayerDataWithRetry() {
     try {
-      const playerData = await this.getPlayerDataFromServer(username);
-      if (playerData) {
-        return playerData;
+      const playersData = await this.getPlayerDataFromServer();
+      if (playersData) {
+        return playersData;
       }
       console.log('First attempt to fetch data failed, retrying...');
       // If first attempt fails, wait and retry once
       await this.delay(5000); // Delay for 5 seconds
-      return await this.getPlayerDataFromServer(username);
+      return await this.getPlayerDataFromServer();
     } catch (error) {
       console.error('Both attempts to fetch player data failed:', error);
-      return null;
+      return [];
     }
   }
 
@@ -69,36 +76,28 @@ class Submission {
   }
 
   /**
-   * Fetch player listening data for a specific user from your server API.
-   * @param {string} username - The username of the player
-   * @returns {Promise<Object|null>} - Player data object or null if not found
+   * Fetch all players' listening data from your server API.
+   * @returns {Promise<Array>} - Array of player data
    */
-  async getPlayerDataFromServer(username) {
+  async getPlayerDataFromServer() {
     try {
-      console.log(`Sending request to fetch data for user: ${username}`);
+      console.log('Sending request to fetch player data from the server');
 
       const response = await fetch('https://reverie-field-project-7a9a67da93ff.herokuapp.com/get_player_data_for_koii', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username }) // Передаем только конкретного пользователя
+        headers: { 'Content-Type': 'application/json' }
       });
 
       if (!response.ok) {
         console.error('Server response error:', response.statusText);
-        return null;
+        return [];
       }
 
-      const playerData = await response.json();
-
-      if (!playerData || playerData.username !== username) {
-        console.error(`No data found for username: ${username}`);
-        return null;
-      }
-
-      return playerData;
+      const playersData = await response.json();
+      return playersData || [];
     } catch (error) {
       console.error('Error fetching data from the server:', error);
-      return null;
+      return [];
     }
   }
 
