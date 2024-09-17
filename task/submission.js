@@ -31,8 +31,14 @@ class Submission {
 
     console.log(`Player data received for user: ${username}`, playerData);
 
+    // Кэширование данных игрока
+    await this.cachePlayerData(username, playerData, round);
+
     console.log(`Uploading data to IPFS for round ${round}...`);
-    await this.uploadDataToIPFS(playerData, round); // Загружаем данные в IPFS
+    const ipfsCid = await this.uploadToIPFS(round); // Загружаем данные в IPFS
+    if (ipfsCid) {
+      await this.submitCidToKoii(ipfsCid, round);
+    }
   }
 
   /**
@@ -83,28 +89,71 @@ class Submission {
   }
 
   /**
-   * Загрузка данных игрока в IPFS.
+   * Кэширование данных игрока.
+   * @param {string} username - Имя пользователя.
    * @param {Object} playerData - Данные игрока.
    * @param {number} round - Номер текущего раунда.
    */
-  async uploadDataToIPFS(playerData, round) {
+  async cachePlayerData(username, playerData, round) {
+    const cacheKey = `player_data_${username}_round_${round}`;
     try {
-      const tempDir = os.tmpdir();
-      const filePath = path.join(tempDir, `playerData_${playerData.username}_round_${round}.json`);
-      fs.writeFileSync(filePath, JSON.stringify({ total_points: playerData.total_points }));
-
-      const userStaking = await namespaceWrapper.getSubmitterAccount();
-      
-      // Загрузка данных в IPFS и получение CID
-      const fileUploadResponse = await this.client.uploadFile(filePath, userStaking);
-      const newCid = fileUploadResponse.cid;
-      console.log('New data uploaded to IPFS with CID:', newCid);
-
-      // Сохраняем CID в кэш для сабмишена
-      const cacheKey = `player_points_${playerData.username}_round_${round}`;
-      await namespaceWrapper.storeSet(cacheKey, newCid);
+      await namespaceWrapper.storeSet(cacheKey, JSON.stringify(playerData));
+      console.log(`Player data cached for user: ${username}, round: ${round}`);
     } catch (error) {
-      console.error('Error uploading data to IPFS:', error);
+      console.error('Error caching player data:', error);
+    }
+  }
+
+  /**
+   * Загрузка данных игрока в IPFS через KoiiStorageClient.
+   * @param {number} round - Номер текущего раунда.
+   * @param {number} retries - Количество повторных попыток при ошибке (по умолчанию 3).
+   * @returns {Promise<string>} - CID загруженных данных.
+   */
+  async uploadToIPFS(round, retries = 3) {
+    const tempDir = os.tmpdir();
+    const cacheKey = `player_data_${process.env.TG_USERNAME}_round_${round}`;
+    const playerData = await namespaceWrapper.storeGet(cacheKey);
+
+    if (!playerData) {
+      console.error('No cached player data found.');
+      return null;
+    }
+
+    const filePath = path.join(tempDir, `playerData_${process.env.TG_USERNAME}_round_${round}.json`);
+    fs.writeFileSync(filePath, playerData);
+
+    const userStaking = await namespaceWrapper.getSubmitterAccount();
+
+    while (retries > 0) {
+      try {
+        const fileUploadResponse = await this.client.uploadFile(filePath, userStaking);
+        console.log('Data uploaded to IPFS, CID:', fileUploadResponse.cid);
+        return fileUploadResponse.cid;
+      } catch (error) {
+        if (retries > 1 && error.message.includes('503')) {
+          console.log('Error uploading data to IPFS, retrying in 5 seconds...');
+          retries--;
+          await new Promise(resolve => setTimeout(resolve, 5000));
+        } else {
+          console.error('Error uploading data to IPFS:', error);
+          throw error;
+        }
+      }
+    }
+  }
+
+  /**
+   * Сабмит CID в Koii.
+   * @param {string} ipfsCid - CID данных.
+   * @param {number} round - Номер текущего раунда.
+   */
+  async submitCidToKoii(ipfsCid, round) {
+    try {
+      await namespaceWrapper.checkSubmissionAndUpdateRound(ipfsCid, round);
+      console.log(`CID ${ipfsCid} successfully submitted for round ${round}`);
+    } catch (error) {
+      console.error('Error submitting CID to Koii:', error);
     }
   }
 
