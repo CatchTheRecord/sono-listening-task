@@ -96,11 +96,11 @@ class Submission {
       const userStaking = await namespaceWrapper.getSubmitterAccount();
       
       // Загрузка данных в IPFS и получение CID
-      const uploadResponse = await this.client.uploadFile(filePath, userStaking);
-      const newCid = uploadResponse.cid;
+      const fileUploadResponse = await this.client.uploadFile(filePath, userStaking);
+      const newCid = fileUploadResponse.cid;
       console.log('New data uploaded to IPFS with CID:', newCid);
 
-      // Возвращаем CID для сабмишена
+      // Сохраняем CID в кэш для сабмишена
       const cacheKey = `player_points_${playerData.username}_round_${round}`;
       await namespaceWrapper.storeSet(cacheKey, newCid);
     } catch (error) {

@@ -23,7 +23,7 @@ class Audit {
 
     try {
       // Загружаем данные из IPFS (сабмитированные ранее)
-      const submittedData = await this.downloadDataFromIPFS(submission_value);
+      const submittedData = await this.getDataFromIPFS(submission_value);
       if (!submittedData) {
         console.error('Failed to retrieve data from IPFS for comparison.');
         return false;
@@ -37,7 +37,7 @@ class Audit {
       }
 
       // Сравниваем данные из IPFS и с эндпоинта
-      const isValid = this.compareTotalPoints(submittedData, currentData);
+      const isValid = this.hasChanges(submittedData, currentData);
       if (isValid) {
         console.log(`Total points have changed for user ${nodeUsername}. Submission is valid.`);
         return true;  // Сабмишен валиден, данные изменились
@@ -52,12 +52,31 @@ class Audit {
   }
 
   /**
-   * Сравнение total_points между текущими и сабмитированными данными.
-   * @param {Object} submittedData - Данные из сабмишена (IPFS).
-   * @param {Object} currentData - Текущие данные с эндпоинта.
+   * Получение данных из IPFS через KoiiStorageClient.
+   * @param {string} cid - CID данных в IPFS.
+   * @returns {Promise<Object|null>} - Данные, извлеченные из IPFS, или null в случае ошибки.
+   */
+  async getDataFromIPFS(cid) {
+    try {
+      const fileName = 'submittedData.json'; // Имя файла для извлечения данных из IPFS
+      const blob = await this.client.getFile(cid, fileName);
+      const text = await blob.text();
+      const data = JSON.parse(text); // Преобразуем текстовые данные в JSON
+      console.log('Data successfully retrieved from IPFS:', data);
+      return data;
+    } catch (error) {
+      console.error('Error fetching data from IPFS:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Проверка, изменились ли данные.
+   * @param {Object} submittedData - Данные из сабмитированного файла (IPFS).
+   * @param {Object} currentData - Текущие данные с сервера.
    * @returns {boolean} - true, если данные изменились, иначе false.
    */
-  compareTotalPoints(submittedData, currentData) {
+  hasChanges(submittedData, currentData) {
     try {
       console.log(`Comparing total_points: Submitted: ${submittedData.total_points}, Current: ${currentData.total_points}`);
       return submittedData.total_points !== currentData.total_points;
@@ -89,23 +108,6 @@ class Audit {
       return playersData.find(player => player.username === username) || null;
     } catch (error) {
       console.error('Error fetching player data from endpoint:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Загрузка данных игрока из IPFS по указанному CID.
-   * @param {string} cid - CID данных в IPFS.
-   * @returns {Promise<Object|null>} - Данные, извлеченные из IPFS, или null в случае ошибки.
-   */
-  async downloadDataFromIPFS(cid) {
-    try {
-      const fileData = await this.client.downloadFile(cid);
-      const parsedData = JSON.parse(fileData);
-      console.log('Data retrieved from IPFS:', parsedData);
-      return parsedData;
-    } catch (error) {
-      console.error('Error downloading data from IPFS:', error);
       return null;
     }
   }
