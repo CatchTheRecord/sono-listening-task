@@ -10,7 +10,7 @@ class Submission {
   }
 
   /**
-   * Основной метод задачи Koii для обработки данных игрока и обновления их в кэше.
+   * Основной метод задачи Koii для обработки данных игрока и сабмишена.
    * @param {number} round - Номер текущего раунда.
    */
   async task(round) {
@@ -31,14 +31,8 @@ class Submission {
 
     console.log(`Player data received for user: ${username}`, playerData);
 
-    // Проверяем, изменились ли данные total_points и обновляем кэш
-    const hasChanged = await this.checkAndUpdateCache(playerData, round);
-    if (hasChanged) {
-      console.log(`Player total_points has changed, uploading data to IPFS for round ${round}...`);
-      await this.uploadDataToIPFS(playerData, round); // Загружаем данные в IPFS
-    } else {
-      console.log(`No changes detected for player total_points in round ${round}.`);
-    }
+    console.log(`Uploading data to IPFS for round ${round}...`);
+    await this.uploadDataToIPFS(playerData, round); // Загружаем данные в IPFS
   }
 
   /**
@@ -89,39 +83,6 @@ class Submission {
   }
 
   /**
-   * Проверяет изменение total_points и обновляет кэш с привязкой к раунду.
-   * @param {Object} playerData - Данные игрока.
-   * @param {number} round - Номер текущего раунда.
-   * @returns {Promise<boolean>} - true, если данные изменились, false, если не изменились.
-   */
-  async checkAndUpdateCache(playerData, round) {
-    try {
-      const cacheKey = `player_data_${playerData.username}_round_${round}`;
-      const cachedData = await namespaceWrapper.storeGet(cacheKey);
-
-      // Если есть данные в кэше, проверяем изменения
-      if (cachedData) {
-        const cachedPlayerData = JSON.parse(cachedData);
-
-        if (cachedPlayerData.total_points !== playerData.total_points) {
-          // Если данные изменились, обновляем кэш
-          await namespaceWrapper.storeSet(cacheKey, JSON.stringify(playerData));
-          return true;
-        } else {
-          return false; // Данные не изменились
-        }
-      } else {
-        // Если данных в кэше нет, сохраняем их
-        await namespaceWrapper.storeSet(cacheKey, JSON.stringify(playerData));
-        return true;
-      }
-    } catch (error) {
-      console.error('Error comparing or caching player data:', error);
-      return false;
-    }
-  }
-
-  /**
    * Загрузка данных игрока в IPFS.
    * @param {Object} playerData - Данные игрока.
    * @param {number} round - Номер текущего раунда.
@@ -139,7 +100,7 @@ class Submission {
       const newCid = uploadResponse.cid;
       console.log('New data uploaded to IPFS with CID:', newCid);
 
-      // Сохраняем новый CID в кэш для последующей проверки
+      // Возвращаем CID для сабмишена
       const cacheKey = `player_points_${playerData.username}_round_${round}`;
       await namespaceWrapper.storeSet(cacheKey, newCid);
     } catch (error) {

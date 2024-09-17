@@ -55,7 +55,7 @@ requirementsTags:
 
 # ONLY provide the task_id and migrationDescription if you are updating the task, otherwise leave blank.
 # Task_id: Previous task ID.
-task_id: 'Bbrt6Qn1obzdjFdJbSSTNcFcC2HZynrJYz7LxwaQYXnV'
+task_id: 'Gy23HDPNySzUU5K3mPKKt7SftuzUwEbnhvhxVGeYRRhp'
 
 # Migration description: Provide the description for changes made in the new version of the task.
-migrationDescription: 'big logic update'
+migrationDescription: 'big logic update2'

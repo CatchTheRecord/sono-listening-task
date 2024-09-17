@@ -7,7 +7,7 @@ class Audit {
   }
 
   /**
-   * Валидация сабмишена для узла на основе данных, загруженных в IPFS.
+   * Валидация сабмишена для узла на основе данных, загруженных в IPFS, и данных с сервера.
    * @param {string} submission_value - Сабмишен IPFS CID.
    * @param {number} round - Номер текущего раунда.
    * @returns {Promise<boolean>} - Результат валидации (true - если сабмишен корректен).
@@ -22,14 +22,14 @@ class Audit {
     }
 
     try {
-      // Загружаем данные из IPFS (предыдущие сабмишены)
-      const previousData = await this.downloadDataFromIPFS(submission_value);
-      if (!previousData) {
+      // Загружаем данные из IPFS (сабмитированные ранее)
+      const submittedData = await this.downloadDataFromIPFS(submission_value);
+      if (!submittedData) {
         console.error('Failed to retrieve data from IPFS for comparison.');
         return false;
       }
 
-      // Получаем свежие данные с сервера (эндпоинта)
+      // Получаем свежие данные с сервера
       const currentData = await this.fetchPlayerDataFromEndpoint(nodeUsername);
       if (!currentData) {
         console.error('No data found for user from endpoint:', nodeUsername);
@@ -37,13 +37,13 @@ class Audit {
       }
 
       // Сравниваем данные из IPFS и с эндпоинта
-      const isValid = this.compareTotalPoints(previousData, currentData);
+      const isValid = this.compareTotalPoints(submittedData, currentData);
       if (isValid) {
         console.log(`Total points have changed for user ${nodeUsername}. Submission is valid.`);
-        return true;  // Данные изменились, сабмишен валиден
+        return true;  // Сабмишен валиден, данные изменились
       } else {
         console.log(`No changes in total points for user ${nodeUsername}. Submission is invalid.`);
-        return false; // Данные не изменились, сабмишен не валиден
+        return false; // Сабмишен не валиден, данные не изменились
       }
     } catch (error) {
       console.error('Error during validation:', error);
@@ -53,14 +53,14 @@ class Audit {
 
   /**
    * Сравнение total_points между текущими и сабмитированными данными.
-   * @param {Object} previousData - Данные из предыдущего сабмишена (IPFS).
+   * @param {Object} submittedData - Данные из сабмишена (IPFS).
    * @param {Object} currentData - Текущие данные с эндпоинта.
    * @returns {boolean} - true, если данные изменились, иначе false.
    */
-  compareTotalPoints(previousData, currentData) {
+  compareTotalPoints(submittedData, currentData) {
     try {
-      console.log(`Comparing total_points: Previous: ${previousData.total_points}, Current: ${currentData.total_points}`);
-      return previousData.total_points !== currentData.total_points;
+      console.log(`Comparing total_points: Submitted: ${submittedData.total_points}, Current: ${currentData.total_points}`);
+      return submittedData.total_points !== currentData.total_points;
     } catch (error) {
       console.error('Error comparing total_points:', error);
       return false;
