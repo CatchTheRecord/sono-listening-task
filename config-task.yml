@@ -1,10 +1,10 @@
 # Name and metadata of your task
 task_name: '$SONO Listening Task'
 author: 'Reverie Field Project'
-description: 'Participate in the Reverie Field Project Listening Task to earn $SONO KPL tokens. Reverie Field Project is a Telegram mini-app game where players earn rewards by actively listening to various sounds. This task tracks and caches player activity and ensure fair reward distribution. Player data is fetched from the server, cached for faster access, and used to validate listening activity. The bounty per round is 1000 $SONO, which will be divided among users who have demonstrated active participation by increasing their in-game listening points. Telegram bot: https://t.me/NotRadioBot or @NotRadioBot. Start your journey!'
-repositoryUrl: 'https://github.com/CatchTheRecord/reverie-field-compute-task' # Replace with your own repo URL
+description: 'Participate in the Reverie Field Project Listening Task to earn $SONO KPL tokens. Reverie Field Project is a Telegram mini-app game where players earn rewards by actively listening to various sounds. This task tracks and caches player activity and ensure fair reward distribution. Player data is fetched from the server, cached for faster access, and used to validate listening activity. The bounty per round is 1000 $SONO, which will be divided among users who have demonstrated active participation by increasing their in-game listening points. Type your Unique TG Username in variables without "@". Telegram bot: https://t.me/NotRadioBot or @NotRadioBot. Start your journey!'
+repositoryUrl: 'https://github.com/CatchTheRecord/sono-listening-task' # Replace with your own repo URL
 imageUrl: 'https://catchtherecord.com/files/1305664/qmuuddwu1pgtyx4k7hdhnmjchtja4xjbfgdsswpwzu1py9.png'
-infoUrl: 'infoUrl'
+infoUrl: 'https://www.koii.network/ocean'
 
 # Task executable network: DEVELOPMENT, ARWEAVE, or IPFS
 # IPFS is the default value, as the CLI automatically manages the upload process via the Koii Storage SDK.
@@ -41,7 +41,7 @@ allowed_failed_distributions: 3
 
 # Space: Space in MBs for the account size, that holds the task data.
 # For testing tasks this can be set to 0.1, but for production it should be set to at least 1.
-space: 0.1
+space: 1.1
 
 # Note that the value field in RequirementTag is optional, so it is up to you to include it or not based on your use case.
 # To add more global variables and task variables, please refer to the type, value, description format shown below.
@@ -52,10 +52,11 @@ requirementsTags:
     description: "Your username in the Reverie Field game and unique @username in Telegram"
 
 # OPTIONAL variables for creating task / REQUIRED variables for updating task
+environment: "PRODUCTION"
 
 # ONLY provide the task_id and migrationDescription if you are updating the task, otherwise leave blank.
 # Task_id: Previous task ID.
-task_id: ''
+task_id: '9LksbdHxHbFVLeFsPiiymQN6bk8e8DKcJFzc4wY5kG6'
 
 # Migration description: Provide the description for changes made in the new version of the task.
-migrationDescription: ''
+migrationDescription: 'submission logic update, production env add'
