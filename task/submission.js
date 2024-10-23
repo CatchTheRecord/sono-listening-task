@@ -137,7 +137,7 @@ class Submission {
   }
 
   /**
-   * Submit data to IPFS and send it to the server for verification.
+   * Submit data to IPFS and send it to the server for verification, only if data changed.
    * @param {number} round - Round number
    */
   async submitTask(round) {
@@ -159,6 +159,13 @@ class Submission {
       }
 
       const playerData = JSON.parse(cachedPlayerData);
+
+      // Ensure player data is up-to-date before submission
+      const isUpdated = await this.cachePlayerDataIfUpdated(playerData);
+      if (!isUpdated) {
+        console.log('Data has not changed. No submission will be made.');
+        return; // Skip submission if data hasn't changed
+      }
 
       // Upload data to IPFS via KoiiStorageClient
       const userStaking = await namespaceWrapper.getSubmitterAccount();
